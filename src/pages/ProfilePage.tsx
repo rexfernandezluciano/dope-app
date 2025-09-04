@@ -2,7 +2,7 @@
 /** @format */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, ScrollView, FlatList, Alert } from "react-native";
+import { View, Text, FlatList, Alert } from "react-native";
 import { Avatar, Button, Card, Chip, IconButton } from "react-native-paper";
 import styles from "../css/styles";
 import PostView from "../components/PostView";

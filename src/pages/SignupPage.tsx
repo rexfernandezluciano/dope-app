@@ -1,10 +1,15 @@
-
 /** @format */
 
 import React, { useState } from "react";
 import { View, Text, Alert, ScrollView } from "react-native";
-import { TextInput, Button, Card, RadioButton, Divider } from "react-native-paper";
-import { useNavigation } from '@react-navigation/native';
+import {
+  TextInput,
+  Button,
+  Card,
+  RadioButton,
+  Divider,
+} from "react-native-paper";
+import { useNavigation } from "@react-navigation/native";
 import styles from "../css/styles";
 import AuthService from "../services/AuthService";
 
@@ -30,20 +35,29 @@ const SignupPage = () => {
     setFormData({ ...formData, [field]: value });
   };
 
-  const checkAvailability = async (field: "username" | "email", value: string) => {
+  const checkAvailability = async (
+    field: "username" | "email",
+    value: string,
+  ) => {
     if (!value) return;
-    
-    const result = field === "username" 
-      ? await AuthService.checkUsernameAvailability(value)
-      : await AuthService.checkEmailAvailability(value);
-    
+
+    const result =
+      field === "username"
+        ? await AuthService.checkUsernameAvailability(value)
+        : await AuthService.checkEmailAvailability(value);
+
     if (!result.available) {
       Alert.alert("Error", `${field} is already taken`);
     }
   };
 
   const handleSignup = async () => {
-    if (!formData.name || !formData.email || !formData.username || !formData.password) {
+    if (
+      !formData.name ||
+      !formData.email ||
+      !formData.username ||
+      !formData.password
+    ) {
       Alert.alert("Error", "Please fill in all required fields");
       return;
     }
@@ -91,7 +105,7 @@ const SignupPage = () => {
       const result = await AuthService.verifyEmail(
         formData.email,
         verificationCode,
-        verificationId
+        verificationId,
       );
 
       if (result.success) {
@@ -109,10 +123,16 @@ const SignupPage = () => {
 
   if (showVerification) {
     return (
-      <ScrollView style={styles.home} contentContainerStyle={{ padding: 16 }}>
-        <View style={{ flex: 1, justifyContent: "center" }}>
+      <ScrollView
+        contentContainerStyle={
+          (styles.home, { padding: 16, justifyContent: "center" })
+        }
+      >
+        <View style={{ flex: 1 }}>
           <Card style={{ padding: 16 }}>
-            <Text style={[styles.h2, { textAlign: "center", marginBottom: 16 }]}>
+            <Text
+              style={[styles.h2, { textAlign: "center", marginBottom: 16 }]}
+            >
               Verify Your Email
             </Text>
             <Text style={{ textAlign: "center", marginBottom: 32 }}>
@@ -141,7 +161,16 @@ const SignupPage = () => {
   }
 
   return (
-    <ScrollView style={styles.home} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView
+      contentContainerStyle={
+        (styles.home,
+        {
+          padding: 16,
+          alignItems: "center",
+          justifyContent: "center",
+        })
+      }
+    >
       <Card style={{ padding: 16 }}>
         <Text style={[styles.h1, { textAlign: "center", marginBottom: 32 }]}>
           Join DOPE Network
@@ -245,10 +274,7 @@ const SignupPage = () => {
 
         <Divider style={{ marginVertical: 16 }} />
 
-        <Button
-          mode="outlined"
-          onPress={() => navigation.navigate("Login")}
-        >
+        <Button mode="outlined" onPress={() => navigation.navigate("Login")}>
           Already have an account? Login
         </Button>
       </Card>

@@ -74,8 +74,8 @@ const BusinessPage = () => {
   }
 
   return (
-    <ScrollView style={styles.home} contentContainerStyle={{ padding: 16 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+    <ScrollView style={styles.home} contentContainerStyle={{ padding: 16, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 24 }}>
         <Text style={styles.h1}>Business Profile</Text>
         <Button
           mode={editMode ? "outlined" : "contained"}

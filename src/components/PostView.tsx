@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, Image, ScrollView, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+  Alert,
+} from "react-native";
 import { Avatar, IconButton, Chip, Card, Icon } from "react-native-paper";
 import styles from "../css/styles";
 import PostService from "../services/PostService";
@@ -80,10 +87,10 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
     }
 
     if (loading) return;
-    
+
     setLoading(true);
     const wasLiked = isLiked;
-    
+
     // Optimistic update
     setIsLiked(!isLiked);
     setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
@@ -131,35 +138,31 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
       return;
     }
 
-    Alert.alert(
-      "Repost",
-      "Do you want to add a comment to this repost?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Repost", 
-          onPress: async () => {
-            try {
-              const result = await PostService.repostPost(post.id);
-              if (result.success) {
-                Alert.alert("Success", "Post reposted successfully!");
-              } else {
-                Alert.alert("Error", result.error || "Failed to repost");
-              }
-            } catch (error) {
-              Alert.alert("Error", "An unexpected error occurred");
+    Alert.alert("Repost", "Do you want to add a comment to this repost?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Repost",
+        onPress: async () => {
+          try {
+            const result = await PostService.repostPost(post.id);
+            if (result.success) {
+              Alert.alert("Success", "Post reposted successfully!");
+            } else {
+              Alert.alert("Error", result.error || "Failed to repost");
             }
+          } catch (error) {
+            Alert.alert("Error", "An unexpected error occurred");
           }
         },
-        { 
-          text: "Add Comment", 
-          onPress: () => {
-            // Navigate to repost with comment screen
-            console.log("Repost with comment:", post.id);
-          }
+      },
+      {
+        text: "Add Comment",
+        onPress: () => {
+          // Navigate to repost with comment screen
+          console.log("Repost with comment:", post.id);
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleVote = async (optionId: string) => {
@@ -228,10 +231,15 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
     if (post.imageUrls.length === 0) return null;
 
     return (
-      <ScrollView 
-        horizontal 
-        style={styles.imageContainer}
-        contentContainerStyle={{ alignItems: 'center' }}
+      <ScrollView
+        horizontal
+        contentContainerStyle={
+          (styles.imageContainer,
+          {
+            alignItems: "center",
+            justifyContent: "center",
+          })
+        } // Ensure proper layout here
         showsHorizontalScrollIndicator={false}
       >
         {post.imageUrls.map((url, index) => (
@@ -257,7 +265,7 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
               size={24}
               source={{ uri: post.originalPost.author.photoURL }}
             />
-            <View style={styles.originalPostAuthorContainer}>
+            <View>
               <Text style={styles.originalPostAuthor}>
                 {post.originalPost.author.name}
               </Text>
@@ -275,10 +283,12 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
             </Text>
           )}
           {post.originalPost.imageUrls.length > 0 && (
-            <ScrollView 
-              horizontal 
-              style={styles.imageContainer}
-              contentContainerStyle={{ alignItems: 'center' }}
+            <ScrollView
+              horizontal
+            contentContainerStyle={styles.imageContainer,{
+                alignItems: "center",
+                justifyContent: "center",
+              }} // Ensure proper layout here
               showsHorizontalScrollIndicator={false}
             >
               {post.originalPost.imageUrls.map((url: string, index: number) => (
@@ -304,10 +314,12 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
     }
 
     return (
-      <ScrollView 
-        horizontal 
-        style={styles.hashtagContainer}
-        contentContainerStyle={{ alignItems: 'center' }}
+      <ScrollView
+        horizontal
+        contentContainerStyle={styles.hashtagContainer, {
+          alignItems: "center",
+          justifyContent: "center",
+        }} // Ensure proper layout here
         showsHorizontalScrollIndicator={false}
       >
         {post.hashtags.map((tag, index) => (
@@ -330,8 +342,8 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
         <View style={styles.postHeader}>
           <Avatar.Image size={40} source={{ uri: post.author.photoURL }} />
           <View style={styles.postAuthorInfo}>
-            <View style={styles.postAuthorName}>
-              <View style={styles.authorNameContainer}>
+            <View>
+              <View>
                 <Text style={styles.authorName}>{post.author.name}</Text>
                 {post.author.hasBlueCheck && (
                   <Icon source="check-decagram" size={16} color="#1DA1F2" />

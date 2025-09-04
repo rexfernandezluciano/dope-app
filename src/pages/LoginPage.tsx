@@ -1,10 +1,9 @@
-
 /** @format */
 
 import React, { useState } from "react";
 import { View, Text, Alert, ScrollView } from "react-native";
 import { TextInput, Button, Card, Divider } from "react-native-paper";
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation } from "@react-navigation/native";
 import styles from "../css/styles";
 import AuthService from "../services/AuthService";
 
@@ -51,9 +50,14 @@ const LoginPage = () => {
   };
 
   return (
-    <ScrollView style={styles.home} contentContainerStyle={{ padding: 16 }}>
-      <View style={{ flex: 1, justifyContent: "center" }}>
-        <Card style={{ padding: 16 }}>
+    <ScrollView
+      contentContainerStyle={
+        (styles.home,
+        { alignItems: "center", justifyContent: "center" })
+      }
+    >
+      <View style={{ flex: 1 }}>
+        <Card style={{ padding: 16, width: "100%", maxWidth: 400, marginTop: 32, marginBottom: 32,"}}>
           <Text style={[styles.h1, { textAlign: "center", marginBottom: 32 }]}>
             Login to DOPE
           </Text>
@@ -100,10 +104,7 @@ const LoginPage = () => {
 
           <Divider style={{ marginVertical: 16 }} />
 
-          <Button
-            mode="outlined"
-            onPress={() => navigation.navigate("Signup")}
-          >
+          <Button mode="outlined" onPress={() => navigation.navigate("Signup")}>
             Create Account
           </Button>
         </Card>

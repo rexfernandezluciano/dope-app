@@ -8,7 +8,6 @@ const styles = StyleSheet.create({
 		justifyContent: "flex-start",
 		alignItems: "flex-start",
 		backgroundColor: "#f5f5f5",
-		padding: 16,
 	},
 	bold: {
 	  fontWeight: "bold"
@@ -39,12 +38,13 @@ const styles = StyleSheet.create({
 	// Post Card Styles
 	postCard: {
 		marginBottom: 12,
-		borderRadius: 12,
+		borderRadius: 0,
 		elevation: 2,
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 1 },
 		shadowOpacity: 0.1,
 		shadowRadius: 2,
+		backgroundColor: "white"
 	},
 
 	postHeader: {
@@ -312,6 +312,7 @@ const styles = StyleSheet.create({
 		backgroundColor: "white",
 		borderBottomWidth: 1,
 		borderBottomColor: "#e1e8ed",
+		width: "100%"
 	},
 
 	searchBar: {

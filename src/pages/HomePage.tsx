@@ -133,23 +133,9 @@ const HomePage = () => {
 
   const renderHeader = () => (
     <View style={styles.homeHeader}>
-      {/* Search Bar */}
-      <Searchbar
-        placeholder="Search posts, users, hashtags..."
-        onChangeText={handleSearch}
-        value={searchQuery}
-        style={styles.searchBar}
-      />
 
       {/* Feed Filter */}
       <View style={styles.filterContainer}>
-        <Chip
-          selected={activeFilter === "home"}
-          onPress={() => handleFilterChange("home")}
-          style={[styles.filterChip, activeFilter === "home" && styles.filterChipActive]}
-        >
-          Home
-        </Chip>
         {AuthService.isAuthenticated && (
           <Chip
             selected={activeFilter === "following"}

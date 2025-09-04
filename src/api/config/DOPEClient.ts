@@ -14,9 +14,11 @@ enum RequestMethod {
 class DOPEClient {
 	private static instance: DOPEClient;
 
+	public baseURL = "https://api.dopp.eu.org";
+
 	private constructor() {
 		this.client = axios.create({
-			baseURL: "https://api.dopp.eu.org",
+			baseURL: this.baseURL,
 			timeout: 60 * 1000
 		});
 	}

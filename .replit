@@ -17,3 +17,15 @@ externalPort = 3000
 
 [agent]
 expertMode = true
+
+[workflows]
+runButton = "Run Web App"
+
+[[workflows.workflow]]
+name = "Run Web App"
+author = 47212852
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run web"

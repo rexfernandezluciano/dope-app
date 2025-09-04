@@ -41,7 +41,7 @@ const NavigationView = ({ children, logo, avatar, tabs, onTabChange, ...props })
       {avatar && (
         <Appbar.Action
           icon={() => (
-            <Avatar.Image size={35} source={avatar} />
+            <Avatar.Image size={28} source={avatar} />
           )}
           style={styles.avatar}
           onPress={() => console.log("Avatar pressed")}
@@ -123,7 +123,11 @@ const styles = StyleSheet.create({
   avatar: {
     border: 1,
     borderColor: '#eeeeee',
-    borderRadius: "60px !important"
+    borderStyle: 'solid',
+    borderRadius: "60px",
+    backgroundColor: '#eeeeee',
+    padding: 0,
+    textAlign: "center"
   }
 });
 

@@ -11,7 +11,7 @@ import HomePage from "./pages/HomePage"
 const App = () => {
 	const [activeTab, setActiveTab] = useState(0);
 
-	const handleTabChange = index => {
+	const handleTabChange = (index: number) => {
 		setActiveTab(index);
 		console.log(`Tab ${index} selected`);
 	};
@@ -33,6 +33,7 @@ const App = () => {
 
 	return (
 		<PaperProvider>
+			<StatusBar style="auto" />
 			<NavigationView
 				logo="DOPE"
 				avatar={{ uri: "https://i.pravatar.cc/150?img=3" }}

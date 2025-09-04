@@ -6,26 +6,40 @@ import styles from "../css/styles";
 import DOPEClient from "../api/config/DOPEClient";
 
 const HomePage = () => {
-	const [posts, setPosts] = useState(null);
+	const [posts, setPosts] = useState([]);
+	const [loading, setLoading] = useState(true);
 	const client = DOPEClient.getInstance();
 
 	useEffect(() => {
 		const fetchHomeFeed = async () => {
 			try {
-				const feed = await client.getHomeFeed();
+				setLoading(true);
+				const feed: any = await client.getHomeFeed();
 				if (feed) {
 					setPosts(feed);
 					console.log("Home Feed:", JSON.stringify(feed, null, 2));
 				}
-			} catch (error) {
+			} catch (error: any) {
 				console.error(error.message);
+			} finally {
+				setLoading(false);
 			}
 		};
 		fetchHomeFeed();
-	}, [posts]);
+	}, [setPosts]);
+
+	if (loading) {
+		return (
+			<View style={styles.home}>
+				<Text>Loading...</Text>
+			</View>
+		)
+	}
+	
+	
 	return (
 		<View style={styles.home}>
-			<Text style={styles.bold}>Feed</Text>
+			<Text style={styles.h3}>Feed</Text>
 		</View>
 	);
 };

@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.dope.ios"
+      "bundleIdentifier": "com.dope.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +22,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "app.dope.android"
+      "package": "com.dope.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"

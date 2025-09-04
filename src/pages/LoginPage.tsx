@@ -8,8 +8,6 @@ import { useNavigation } from '@react-navigation/native';
 import styles from "../css/styles";
 import AuthService from "../services/AuthService";
 
-import { useNavigation } from '@react-navigation/native';
-
 const LoginPage = () => {
   const navigation = useNavigation();
   const [email, setEmail] = useState("");

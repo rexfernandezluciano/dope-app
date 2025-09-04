@@ -144,11 +144,17 @@ const styles = StyleSheet.create({
 		marginBottom: 12,
 	},
 
+	liveIndicatorContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 4,
+	},
+
 	liveIndicator: {
 		color: "white",
 		fontWeight: "bold",
 		fontSize: 12,
-		marginBottom: 4,
+		marginLeft: 4,
 	},
 
 	liveVideoUrl: {

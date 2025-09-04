@@ -1,7 +1,9 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Image, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, Image, ScrollView, Alert } from "react-native";
 import { Avatar, IconButton, Chip, Card, Icon } from "react-native-paper";
 import styles from "../css/styles";
+import PostService from "../services/PostService";
+import AuthService from "../services/AuthService";
 
 interface Post {
   id: string;
@@ -61,35 +63,124 @@ interface PostViewProps {
 
 const PostView: React.FC<PostViewProps> = ({ post }) => {
   const [isLiked, setIsLiked] = useState(
-    post.likes.some((like) => like.user.uid === "current_user_id"), // Replace with actual current user ID
+    post.likes.some((like) => like.user.uid === AuthService.user?.uid),
   );
   const [likeCount, setLikeCount] = useState(post.stats.likes);
+  const [loading, setLoading] = useState(false);
 
-  const handleLike = () => {
+  useEffect(() => {
+    // Track post view when component mounts
+    PostService.trackPostView(post.id);
+  }, [post.id]);
+
+  const handleLike = async () => {
+    if (!AuthService.isAuthenticated) {
+      Alert.alert("Authentication Required", "Please log in to like posts");
+      return;
+    }
+
+    if (loading) return;
+    
+    setLoading(true);
+    const wasLiked = isLiked;
+    
+    // Optimistic update
     setIsLiked(!isLiked);
     setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
-    // TODO: Call API endpoint POST /v1/posts/:postId/like
+
+    try {
+      const result = await PostService.likePost(post.id);
+      if (!result.success) {
+        // Revert on failure
+        setIsLiked(wasLiked);
+        setLikeCount((prev) => (wasLiked ? prev + 1 : prev - 1));
+        Alert.alert("Error", result.error || "Failed to like post");
+      }
+    } catch (error) {
+      // Revert on error
+      setIsLiked(wasLiked);
+      setLikeCount((prev) => (wasLiked ? prev + 1 : prev - 1));
+      Alert.alert("Error", "An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleComment = () => {
-    // TODO: Navigate to comment screen or open comment modal
+    // Navigate to comment screen - you'll need to implement this based on your navigation
     console.log("Comment on post:", post.id);
+    // Example: navigation.navigate("Comments", { postId: post.id });
   };
 
-  const handleShare = () => {
-    // TODO: Call API endpoint POST /v1/posts/share/:id
-    console.log("Share post:", post.id);
+  const handleShare = async () => {
+    try {
+      const result = await PostService.sharePost(post.id);
+      if (result.success) {
+        Alert.alert("Success", "Post shared successfully!");
+      } else {
+        Alert.alert("Error", result.error || "Failed to share post");
+      }
+    } catch (error) {
+      Alert.alert("Error", "An unexpected error occurred");
+    }
   };
 
-  const handleRepost = () => {
-    // TODO: Call API endpoint POST /v1/posts/:id/repost
-    console.log("Repost:", post.id);
+  const handleRepost = async () => {
+    if (!AuthService.isAuthenticated) {
+      Alert.alert("Authentication Required", "Please log in to repost");
+      return;
+    }
+
+    Alert.alert(
+      "Repost",
+      "Do you want to add a comment to this repost?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Repost", 
+          onPress: async () => {
+            try {
+              const result = await PostService.repostPost(post.id);
+              if (result.success) {
+                Alert.alert("Success", "Post reposted successfully!");
+              } else {
+                Alert.alert("Error", result.error || "Failed to repost");
+              }
+            } catch (error) {
+              Alert.alert("Error", "An unexpected error occurred");
+            }
+          }
+        },
+        { 
+          text: "Add Comment", 
+          onPress: () => {
+            // Navigate to repost with comment screen
+            console.log("Repost with comment:", post.id);
+          }
+        },
+      ]
+    );
   };
 
-  const handleVote = (optionId: string) => {
-    if (post.poll?.hasUserVoted) return;
-    // TODO: Call API endpoint POST /v1/polls/:pollId/vote
-    console.log("Vote on option:", optionId);
+  const handleVote = async (optionId: string) => {
+    if (!AuthService.isAuthenticated) {
+      Alert.alert("Authentication Required", "Please log in to vote");
+      return;
+    }
+
+    if (post.poll?.hasUserVoted || post.poll?.isExpired) return;
+
+    try {
+      const result = await PostService.voteOnPoll(post.poll!.id, [optionId]);
+      if (result.success) {
+        Alert.alert("Success", "Vote submitted successfully!");
+        // You might want to refresh the post data here
+      } else {
+        Alert.alert("Error", result.error || "Failed to vote");
+      }
+    } catch (error) {
+      Alert.alert("Error", "An unexpected error occurred");
+    }
   };
 
   const formatDate = (dateString: string) => {

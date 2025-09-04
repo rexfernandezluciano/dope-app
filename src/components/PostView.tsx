@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Image, ScrollView } from "react-native";
-import { Avatar, IconButton, Chip, Card } from "react-native-paper";
+import { Avatar, IconButton, Chip, Card, Icon } from "react-native-paper";
 import styles from "../css/styles";
 
 interface Post {
@@ -161,10 +161,14 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
               size={24}
               source={{ uri: post.originalPost.author.photoURL }}
             />
-            <Text style={styles.originalPostAuthor}>
-              {post.originalPost.author.name}
-              {post.originalPost.author.hasBlueCheck && " ✓"}
-            </Text>
+            <View style={styles.originalPostAuthorContainer}>
+              <Text style={styles.originalPostAuthor}>
+                {post.originalPost.author.name}
+              </Text>
+              {post.originalPost.author.hasBlueCheck && (
+                <Icon source="check-decagram" size={12} color="#1DA1F2" />
+              )}
+            </View>
             <Text style={styles.originalPostUsername}>
               @{post.originalPost.author.username}
             </Text>
@@ -221,12 +225,12 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
           <Avatar.Image size={40} source={{ uri: post.author.photoURL }} />
           <View style={styles.postAuthorInfo}>
             <View style={styles.postAuthorName}>
-              <Text style={styles.authorName}>
-                {post.author.name}
+              <View style={styles.authorNameContainer}>
+                <Text style={styles.authorName}>{post.author.name}</Text>
                 {post.author.hasBlueCheck && (
-                  <Text style={styles.blueCheck}> ✓</Text>
+                  <Icon source="check-decagram" size={16} color="#1DA1F2" />
                 )}
-              </Text>
+              </View>
               <Text style={styles.authorUsername}>@{post.author.username}</Text>
             </View>
             <Text style={styles.postDate}>{formatDate(post.createdAt)}</Text>
@@ -254,7 +258,10 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
         {/* Live Video */}
         {post.postType === "live_video" && post.liveVideoUrl && (
           <View style={styles.liveVideoContainer}>
-            <Text style={styles.liveIndicator}>🔴 LIVE</Text>
+            <View style={styles.liveIndicatorContainer}>
+              <Icon source="record-circle" size={16} color="#ff1744" />
+              <Text style={styles.liveIndicator}>LIVE</Text>
+            </View>
             <Text style={styles.liveVideoUrl}>{post.liveVideoUrl}</Text>
           </View>
         )}

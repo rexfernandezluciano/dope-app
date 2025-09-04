@@ -58,10 +58,10 @@ const styles = StyleSheet.create({
 		marginLeft: 12,
 	},
 
-	postAuthorName: {
+	postAuthorNameContainer: {
 		flexDirection: "row",
 		alignItems: "center",
-		flexWrap: "wrap",
+		gap: 4,
 	},
 
 	authorName: {
@@ -70,15 +70,10 @@ const styles = StyleSheet.create({
 		color: "#1a1a1a",
 	},
 
-	blueCheck: {
-		color: "#1DA1F2",
-		fontSize: 16,
-	},
-
 	authorUsername: {
 		fontSize: 14,
 		color: "#657786",
-		marginLeft: 8,
+		marginLeft: 4,
 	},
 
 	postDate: {

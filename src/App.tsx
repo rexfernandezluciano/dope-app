@@ -1,0 +1,47 @@
+/** @format */
+
+import { useState, useEffect } from "react";
+import { StatusBar } from "expo-status-bar";
+import { Text, View } from "react-native";
+import { PaperProvider } from "react-native-paper";
+
+import NavigationView from "./components/navs/NavigationView";
+import HomePage from "./pages/HomePage"
+
+const App = () => {
+	const [activeTab, setActiveTab] = useState(0);
+
+	const handleTabChange = index => {
+		setActiveTab(index);
+		console.log(`Tab ${index} selected`);
+	};
+
+	const tabs = [{ title: "Home" }, { title: "Settings" }, { title: "Profile" }];
+
+	const renderContent = () => {
+		switch (activeTab) {
+			case 0:
+				return <HomePage />;
+			case 1:
+				return <Text>Settings Content</Text>;
+			case 2:
+				return <Text>Profile Content</Text>;
+			default:
+				return <Text>Default Content</Text>;
+		}
+	};
+
+	return (
+		<PaperProvider>
+			<NavigationView
+				logo="DOPE"
+				avatar={{ uri: "https://i.pravatar.cc/150?img=3" }}
+				tabs={tabs}
+				onTabChange={handleTabChange}>
+				{renderContent()}
+			</NavigationView>
+		</PaperProvider>
+	);
+};
+
+export default App;

@@ -4,10 +4,12 @@
 import React, { useState } from "react";
 import { View, Text, Alert, ScrollView } from "react-native";
 import { TextInput, Button, Card, RadioButton, Divider } from "react-native-paper";
+import { useNavigation } from '@react-navigation/native';
 import styles from "../css/styles";
 import AuthService from "../services/AuthService";
 
-const SignupPage = ({ navigation }: any) => {
+const SignupPage = () => {
+  const navigation = useNavigation();
   const [formData, setFormData] = useState({
     name: "",
     email: "",

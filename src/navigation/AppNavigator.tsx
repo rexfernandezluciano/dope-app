@@ -71,10 +71,18 @@ const MainTabNavigator = () => {
 };
 
 const AppNavigator = () => {
+  const [isAuthenticated, setIsAuthenticated] = React.useState(AuthService.isAuthenticated);
+
+  React.useEffect(() => {
+    // Listen for auth state changes
+    const checkAuth = () => setIsAuthenticated(AuthService.isAuthenticated);
+    checkAuth();
+  }, []);
+
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!AuthService.isAuthenticated ? (
+        {!isAuthenticated ? (
           <>
             <Stack.Screen name="Login" component={LoginPage} />
             <Stack.Screen name="Signup" component={SignupPage} />

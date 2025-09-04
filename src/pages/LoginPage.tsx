@@ -4,10 +4,14 @@
 import React, { useState } from "react";
 import { View, Text, Alert, ScrollView } from "react-native";
 import { TextInput, Button, Card, Divider } from "react-native-paper";
+import { useNavigation } from '@react-navigation/native';
 import styles from "../css/styles";
 import AuthService from "../services/AuthService";
 
-const LoginPage = ({ navigation }: any) => {
+import { useNavigation } from '@react-navigation/native';
+
+const LoginPage = () => {
+  const navigation = useNavigation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [tfaCode, setTfaCode] = useState("");

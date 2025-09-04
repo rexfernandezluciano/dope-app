@@ -1,32 +1,34 @@
+
 /** @format */
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Platform, Dimensions } from "react-native";
-import { Appbar, Avatar, useTheme, Text, Tabs, Tab } from "react-native-paper";
+import { View, StyleSheet, Platform, Dimensions, TouchableOpacity, ScrollView } from "react-native";
+import { Appbar, Avatar, useTheme, Text } from "react-native-paper";
 
-const NavigationView = ({ children, logo, avatar, tabs, onTabChange, ...props }) => {
+const NavigationView = ({ children, logo, avatar, onTabChange, ...props }) => {
   const theme = useTheme();
   const [isDesktop, setIsDesktop] = useState(false);
   const [windowWidth, setWindowWidth] = useState(Dimensions.get('window').width);
   const [activeTabIndex, setActiveTabIndex] = useState(0);
 
+  const tabs = [
+    { title: "Feed", icon: "🏠" },
+    { title: "Following", icon: "👥" },
+    { title: "Trending", icon: "🔥" }
+  ];
+
   useEffect(() => {
     const handleResize = () => {
-      setWindowWidth(Dimensions.get('window').width);
-      setIsDesktop(Dimensions.get('window').width > 768); // Adjust breakpoint as needed
+      const width = Dimensions.get('window').width;
+      setWindowWidth(width);
+      setIsDesktop(width > 768);
     };
 
-    Dimensions.addEventListener('change', handleResize);
-    handleResize(); // Initial check
+    const subscription = Dimensions.addEventListener('change', handleResize);
+    handleResize();
 
-    return () => {
-      Dimensions.removeEventListener('change', handleResize);
-    };
+    return () => subscription?.remove?.();
   }, []);
-
-  useEffect(() => {
-    setIsDesktop(windowWidth > 768);
-  }, [windowWidth]);
 
   const handleTabPress = (index) => {
     setActiveTabIndex(index);
@@ -35,100 +37,278 @@ const NavigationView = ({ children, logo, avatar, tabs, onTabChange, ...props })
     }
   };
 
-  const renderMobileAppbar = () => (
-    <Appbar.Header style={styles.appbar}>
-      <Appbar.Content title={logo || "DOPE"} />
-      {avatar && (
-        <Appbar.Action
-          icon={() => (
-            <Avatar.Image size={28} source={avatar} />
+  const renderTabButton = (tab, index) => {
+    const isActive = activeTabIndex === index;
+    return (
+      <TouchableOpacity
+        key={index}
+        style={[
+          styles.tabButton,
+          isActive && styles.activeTabButton,
+          isDesktop && styles.desktopTabButton
+        ]}
+        onPress={() => handleTabPress(index)}
+        activeOpacity={0.7}
+      >
+        <Text style={[
+          styles.tabIcon,
+          isActive && styles.activeTabIcon
+        ]}>
+          {tab.icon}
+        </Text>
+        <Text style={[
+          styles.tabText,
+          isActive && styles.activeTabText,
+          isDesktop && styles.desktopTabText
+        ]}>
+          {tab.title}
+        </Text>
+        {isActive && <View style={styles.activeIndicator} />}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderMobileLayout = () => (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.mobileHeader}>
+        <View style={styles.headerContent}>
+          <Text style={styles.logoText}>{logo || "DOPE"}</Text>
+          {avatar && (
+            <TouchableOpacity
+              style={styles.avatarContainer}
+              onPress={() => console.log("Avatar pressed")}
+              activeOpacity={0.8}
+            >
+              <Avatar.Image size={32} source={avatar} style={styles.avatar} />
+            </TouchableOpacity>
           )}
-          style={styles.avatar}
-          onPress={() => console.log("Avatar pressed")}
-        />
-      )}
-    </Appbar.Header>
+        </View>
+      </View>
+
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabScrollContent}
+          style={styles.tabScroll}
+        >
+          {tabs.map(renderTabButton)}
+        </ScrollView>
+      </View>
+
+      {/* Content */}
+      <View style={styles.contentContainer}>
+        {children}
+      </View>
+    </View>
   );
 
   const renderDesktopLayout = () => (
     <View style={styles.desktopContainer}>
-      <View style={styles.desktopSidebar}>
-        {logo && <Text style={styles.logo}>{logo}</Text>}
-        <Tabs
-          style={styles.desktopTabs}
-          theme={theme}
-          onChange={handleTabPress}
-          selectedIndex={activeTabIndex}
-        >
-          {tabs &&
-            tabs.map((tab, index) => (
-              <Tab key={index} text={tab.title} />
-            ))}
-        </Tabs>
+      {/* Sidebar */}
+      <View style={styles.sidebar}>
+        <View style={styles.sidebarHeader}>
+          <Text style={styles.desktopLogo}>{logo || "DOPE"}</Text>
+        </View>
+        
+        <View style={styles.sidebarTabs}>
+          {tabs.map(renderTabButton)}
+        </View>
+
         {avatar && (
-          <Avatar.Image
-            size={35}
-            source={avatar}
-            style={styles.desktopAvatar}
-          />
+          <View style={styles.sidebarFooter}>
+            <TouchableOpacity
+              style={styles.desktopAvatarContainer}
+              onPress={() => console.log("Avatar pressed")}
+              activeOpacity={0.8}
+            >
+              <Avatar.Image size={40} source={avatar} style={styles.desktopAvatar} />
+            </TouchableOpacity>
+          </View>
         )}
       </View>
-      <View style={styles.desktopContent}>{children}</View>
+
+      {/* Main Content */}
+      <View style={styles.desktopContent}>
+        {children}
+      </View>
     </View>
   );
 
-  return (
-    <View style={styles.container} {...props}>
-      {isDesktop ? renderDesktopLayout() : renderMobileAppbar()}
-      {!isDesktop && children}
-    </View>
-  );
+  return isDesktop ? renderDesktopLayout() : renderMobileLayout();
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 0
+    backgroundColor: "#ffffff",
   },
-  appbar: {
-    backgroundColor: "#fff",
-    height: "auto"
+  
+  // Mobile Header
+  mobileHeader: {
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+    paddingTop: Platform.OS === 'ios' ? 44 : 0,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    height: 44,
+  },
+  logoText: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#1a1a1a",
+    letterSpacing: -0.5,
+  },
+  avatarContainer: {
+    padding: 2,
+  },
+  avatar: {
+    borderWidth: 2,
+    borderColor: "#f0f0f0",
+  },
+
+  // Tab Navigation
+  tabContainer: {
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  tabScroll: {
+    flexGrow: 0,
+  },
+  tabScrollContent: {
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  tabButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginRight: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    minWidth: 80,
+  },
+  activeTabButton: {
+    // Active state styling handled by indicator
+  },
+  tabIcon: {
+    fontSize: 18,
+    marginBottom: 4,
+    opacity: 0.6,
+  },
+  activeTabIcon: {
+    opacity: 1,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666666",
+    textAlign: "center",
+  },
+  activeTabText: {
+    color: "#1a1a1a",
+    fontWeight: "600",
+  },
+  activeIndicator: {
+    position: "absolute",
+    bottom: 0,
+    left: "20%",
+    right: "20%",
+    height: 3,
+    backgroundColor: "#007AFF",
+    borderRadius: 2,
+  },
+
+  // Content
+  contentContainer: {
+    flex: 1,
+    backgroundColor: "#fafafa",
+  },
+
+  // Desktop Layout
   desktopContainer: {
     flex: 1,
     flexDirection: "row",
+    backgroundColor: "#fafafa",
   },
-  desktopSidebar: {
-    width: 200, // Adjust as needed
-    backgroundColor: "#f0f0f0",
-    padding: 16,
+  sidebar: {
+    width: 240,
+    backgroundColor: "#ffffff",
     borderRightWidth: 1,
-    borderRightColor: "#ccc",
+    borderRightColor: "#e5e5e5",
+    shadowColor: "#000",
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  desktopTabs: {
-    marginTop: 16,
+  sidebarHeader: {
+    padding: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  desktopLogo: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#1a1a1a",
+    letterSpacing: -0.8,
+  },
+  sidebarTabs: {
+    flex: 1,
+    paddingTop: 16,
+  },
+  desktopTabButton: {
+    flexDirection: "row",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginVertical: 2,
+    marginHorizontal: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    backgroundColor: "transparent",
+  },
+  desktopTabText: {
+    marginLeft: 12,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  sidebarFooter: {
+    padding: 24,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+  },
+  desktopAvatarContainer: {
+    padding: 4,
+    alignSelf: "flex-start",
+  },
+  desktopAvatar: {
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
   },
   desktopContent: {
     flex: 1,
-    padding: 16,
+    backgroundColor: "#fafafa",
   },
-  logo: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 16,
+
+  // Active states for desktop
+  activeDesktopTab: {
+    backgroundColor: "#f0f8ff",
   },
-  desktopAvatar: {
-    marginTop: 'auto',
-  },
-  avatar: {
-    border: 1,
-    borderColor: '#eeeeee',
-    borderStyle: 'solid',
-    borderRadius: "60px",
-    backgroundColor: '#eeeeee',
-    padding: 0,
-    textAlign: "center"
-  }
 });
 
 export default NavigationView;

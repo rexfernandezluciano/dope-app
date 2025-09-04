@@ -12,9 +12,9 @@ const NavigationView = ({ children, logo, avatar, onTabChange, ...props }) => {
   const [activeTabIndex, setActiveTabIndex] = useState(0);
 
   const tabs = [
-    { title: "Feed", icon: "🏠" },
-    { title: "Following", icon: "👥" },
-    { title: "Trending", icon: "🔥" }
+    { title: "Feed" },
+    { title: "Following" },
+    { title: "Trending" }
   ];
 
   useEffect(() => {
@@ -51,12 +51,6 @@ const NavigationView = ({ children, logo, avatar, onTabChange, ...props }) => {
         activeOpacity={0.7}
       >
         <Text style={[
-          styles.tabIcon,
-          isActive && styles.activeTabIcon
-        ]}>
-          {tab.icon}
-        </Text>
-        <Text style={[
           styles.tabText,
           isActive && styles.activeTabText,
           isDesktop && styles.desktopTabText
@@ -88,14 +82,9 @@ const NavigationView = ({ children, logo, avatar, onTabChange, ...props }) => {
 
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabScrollContent}
-          style={styles.tabScroll}
-        >
+        <View style={styles.tabRow}>
           {tabs.map(renderTabButton)}
-        </ScrollView>
+        </View>
       </View>
 
       {/* Content */}
@@ -186,32 +175,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
   },
-  tabScroll: {
-    flexGrow: 0,
-  },
-  tabScrollContent: {
-    paddingHorizontal: 16,
-    alignItems: "center",
+  tabRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 0,
   },
   tabButton: {
+    flex: 1,
     paddingVertical: 16,
-    paddingHorizontal: 20,
-    marginRight: 8,
+    paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-    minWidth: 80,
   },
   activeTabButton: {
     // Active state styling handled by indicator
-  },
-  tabIcon: {
-    fontSize: 18,
-    marginBottom: 4,
-    opacity: 0.6,
-  },
-  activeTabIcon: {
-    opacity: 1,
   },
   tabText: {
     fontSize: 14,
@@ -226,8 +204,8 @@ const styles = StyleSheet.create({
   activeIndicator: {
     position: "absolute",
     bottom: 0,
-    left: "20%",
-    right: "20%",
+    left: 16,
+    right: 16,
     height: 3,
     backgroundColor: "#007AFF",
     borderRadius: 2,

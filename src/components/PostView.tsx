@@ -1,7 +1,6 @@
-
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Image, ScrollView } from "react-native";
-import { List, Avatar, IconButton, Chip, Card, Button } from "react-native-paper";
+import { Avatar, IconButton, Chip, Card } from "react-native-paper";
 import styles from "../css/styles";
 
 interface Post {
@@ -62,13 +61,13 @@ interface PostViewProps {
 
 const PostView: React.FC<PostViewProps> = ({ post }) => {
   const [isLiked, setIsLiked] = useState(
-    post.likes.some(like => like.user.uid === "current_user_id") // Replace with actual current user ID
+    post.likes.some((like) => like.user.uid === "current_user_id"), // Replace with actual current user ID
   );
   const [likeCount, setLikeCount] = useState(post.stats.likes);
 
   const handleLike = () => {
     setIsLiked(!isLiked);
-    setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+    setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
     // TODO: Call API endpoint POST /v1/posts/:postId/like
   };
 
@@ -109,7 +108,7 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
             key={option.id}
             style={[
               styles.pollOption,
-              option.isUserChoice && styles.pollOptionSelected
+              option.isUserChoice && styles.pollOptionSelected,
             ]}
             onPress={() => handleVote(option.id)}
             disabled={post.poll?.hasUserVoted || post.poll?.isExpired}
@@ -121,11 +120,8 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
                 <Text style={styles.pollVotes}>{option.votes} votes</Text>
               </View>
             </View>
-            <View 
-              style={[
-                styles.pollBar,
-                { width: `${option.percentage}%` }
-              ]}
+            <View
+              style={[styles.pollBar, { width: `${option.percentage}%` }]}
             />
           </TouchableOpacity>
         ))}
@@ -161,9 +157,9 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
       <Card style={styles.originalPostCard}>
         <Card.Content>
           <View style={styles.originalPostHeader}>
-            <Avatar.Image 
-              size={24} 
-              source={{ uri: post.originalPost.author.photoURL }} 
+            <Avatar.Image
+              size={24}
+              source={{ uri: post.originalPost.author.photoURL }}
             />
             <Text style={styles.originalPostAuthor}>
               {post.originalPost.author.name}
@@ -196,12 +192,20 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
   };
 
   const renderHashtags = () => {
-    if (post.hashtags.length === 0) return null;
+    if (post.hashtags?.length === 0) return null;
+
+    if (!Array.isArray(post.hashtags)) {
+      return null;
+    }
 
     return (
       <ScrollView horizontal style={styles.hashtagContainer}>
         {post.hashtags.map((tag, index) => (
-          <Chip key={index} style={styles.hashtag} textStyle={styles.hashtagText}>
+          <Chip
+            key={index}
+            style={styles.hashtag}
+            textStyle={styles.hashtagText}
+          >
             #{tag}
           </Chip>
         ))}
@@ -239,9 +243,7 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
         )}
 
         {/* Post Content */}
-        {post.content && (
-          <Text style={styles.postContent}>{post.content}</Text>
-        )}
+        {post.content && <Text style={styles.postContent}>{post.content}</Text>}
 
         {/* Hashtags */}
         {renderHashtags()}
@@ -283,16 +285,18 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
             <Text style={styles.actionText}>{post.stats.reposts}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.actionButton, isLiked && styles.actionButtonActive]} 
+          <TouchableOpacity
+            style={[styles.actionButton, isLiked && styles.actionButtonActive]}
             onPress={handleLike}
           >
-            <IconButton 
-              icon={isLiked ? "heart" : "heart-outline"} 
-              size={20} 
+            <IconButton
+              icon={isLiked ? "heart" : "heart-outline"}
+              size={20}
               iconColor={isLiked ? "#e91e63" : undefined}
             />
-            <Text style={[styles.actionText, isLiked && styles.actionTextActive]}>
+            <Text
+              style={[styles.actionText, isLiked && styles.actionTextActive]}
+            >
               {likeCount}
             </Text>
           </TouchableOpacity>

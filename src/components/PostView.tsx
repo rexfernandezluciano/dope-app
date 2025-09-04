@@ -228,7 +228,12 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
     if (post.imageUrls.length === 0) return null;
 
     return (
-      <ScrollView horizontal style={styles.imageContainer}>
+      <ScrollView 
+        horizontal 
+        style={styles.imageContainer}
+        contentContainerStyle={{ alignItems: 'center' }}
+        showsHorizontalScrollIndicator={false}
+      >
         {post.imageUrls.map((url, index) => (
           <Image
             key={index}
@@ -270,7 +275,12 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
             </Text>
           )}
           {post.originalPost.imageUrls.length > 0 && (
-            <ScrollView horizontal style={styles.imageContainer}>
+            <ScrollView 
+              horizontal 
+              style={styles.imageContainer}
+              contentContainerStyle={{ alignItems: 'center' }}
+              showsHorizontalScrollIndicator={false}
+            >
               {post.originalPost.imageUrls.map((url: string, index: number) => (
                 <Image
                   key={index}
@@ -294,7 +304,12 @@ const PostView: React.FC<PostViewProps> = ({ post }) => {
     }
 
     return (
-      <ScrollView horizontal style={styles.hashtagContainer}>
+      <ScrollView 
+        horizontal 
+        style={styles.hashtagContainer}
+        contentContainerStyle={{ alignItems: 'center' }}
+        showsHorizontalScrollIndicator={false}
+      >
         {post.hashtags.map((tag, index) => (
           <Chip
             key={index}

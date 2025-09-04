@@ -1,8 +1,8 @@
 /** @format */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { StatusBar } from "expo-status-bar";
-import { Text, View } from "react-native";
+import { Text } from "react-native";
 import { PaperProvider } from "react-native-paper";
 
 import NavigationView from "./components/navs/NavigationView";

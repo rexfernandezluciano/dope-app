@@ -5,6 +5,8 @@ import { View, Text } from "react-native";
 import styles from "../css/styles";
 import DOPEClient from "../api/config/DOPEClient";
 
+import PostView from "../components/PostView";
+
 const HomePage = () => {
 	const [posts, setPosts] = useState([]);
 	const [loading, setLoading] = useState(true);
@@ -33,13 +35,15 @@ const HomePage = () => {
 			<View style={styles.home}>
 				<Text>Loading...</Text>
 			</View>
-		)
+		);
 	}
-	
-	
+
 	return (
 		<View style={styles.home}>
-			<Text style={styles.h3}>Feed</Text>
+			<Text style={styles.h2}>Feed</Text>
+			{posts.map((post: any) => (
+				<PostView key={post.id} post={post} />
+			))}
 		</View>
 	);
 };

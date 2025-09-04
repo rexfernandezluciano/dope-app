@@ -160,6 +160,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#1a1a1a",
     letterSpacing: -0.5,
+    marginTop: 8
   },
   avatarContainer: {
     padding: 2,

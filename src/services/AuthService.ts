@@ -1,283 +1,305 @@
+/** @format */
 
-import DOPEClient from "../api/config/DOPEClient";
+import DOPEClient, { RequestMethod } from "../api/config/DOPEClient";
+import { saveSecure, getSecure } from "../utils/storage.utils.ts";
 
 export interface User {
-  uid: string;
-  name: string;
-  username: string;
-  email: string;
-  bio?: string;
-  photoURL?: string;
-  coverPhotoURL?: string;
-  gender?: "male" | "female" | "non_binary" | "prefer_not_to_say";
-  birthday?: string;
-  hasBlueCheck: boolean;
-  membership: {
-    subscription: "free" | "premium" | "pro";
-    nextBillingDate?: string;
-  };
-  stats?: {
-    posts: number;
-    followers: number;
-    followings: number;
-    likes: number;
-  };
-  privacy: {
-    profile: "public" | "private";
-    comments: "public" | "followers" | "private";
-    sharing: boolean;
-    chat: "public" | "followers" | "private";
-  };
-  hasVerifiedEmail: boolean;
-  createdAt: string;
-  updatedAt: string;
+	uid: string;
+	name: string;
+	username: string;
+	email: string;
+	bio?: string;
+	photoURL?: string;
+	coverPhotoURL?: string;
+	gender?: "male" | "female" | "non_binary" | "prefer_not_to_say";
+	birthday?: string;
+	hasBlueCheck: boolean;
+	membership: {
+		subscription: "free" | "premium" | "pro";
+		nextBillingDate?: string;
+	};
+	stats?: {
+		posts: number;
+		followers: number;
+		followings: number;
+		likes: number;
+	};
+	privacy: {
+		profile: "public" | "private";
+		comments: "public" | "followers" | "private";
+		sharing: boolean;
+		chat: "public" | "followers" | "private";
+	};
+	hasVerifiedEmail: boolean;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface LoginCredentials {
-  email: string;
-  password: string;
-  tfaCode?: string;
+	email: string;
+	password: string;
+	tfaCode?: string;
 }
 
 export interface RegisterData {
-  name: string;
-  email: string;
-  username: string;
-  password: string;
-  photoURL?: string;
-  coverPhotoURL?: string;
-  gender?: "male" | "female" | "non_binary" | "prefer_not_to_say";
-  birthday?: string;
-  subscription?: "free" | "premium" | "pro";
-  privacy?: {
-    profile: "public" | "private";
-    comments: "public" | "followers" | "private";
-    sharing: boolean;
-    chat: "public" | "followers" | "private";
-  };
+	name: string;
+	email: string;
+	username: string;
+	password: string;
+	photoURL?: string;
+	coverPhotoURL?: string;
+	gender?: "male" | "female" | "non_binary" | "prefer_not_to_say";
+	birthday?: string;
+	subscription?: "free" | "premium" | "pro";
+	privacy?: {
+		profile: "public" | "private";
+		comments: "public" | "followers" | "private";
+		sharing: boolean;
+		chat: "public" | "followers" | "private";
+	};
 }
 
 class AuthService {
-  private client: DOPEClient;
-  private currentUser: User | null = null;
-  private authToken: string | null = null;
+	private client: DOPEClient;
+	private currentUser: User | null = null;
+	private authToken: string | null = null;
 
-  constructor() {
-    this.client = DOPEClient.getInstance();
-  }
+	constructor() {
+		this.client = DOPEClient.getInstance();
+		this.fecthAuth()
+			.then(data => console.log("success"))
+			.catch(err => console.error("failed"));
+	}
 
-  // Authentication Methods
-  async login(credentials: LoginCredentials): Promise<{ success: boolean; user?: User; error?: string }> {
-    try {
-      const response = await fetch(`${this.client.baseURL}/v1/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
+	private fecthAuth = async () => {
+		try {
+			const token = await getSecure("authToken", { encrypt: true });
+			if (!token) {
+				return null;
+			}
 
-      const data = await response.json();
+			const me = await this.apiRequest("/v1/auth/me", RequestMethod.GET, {}, { Authorization: `Bearer ${this.authToken}` });
+			if (me.status === "ok") {
+				this.authToken = token;
+				this.currentUser = me.user;
+				return me.user;
+			} else {
+				return null;
+			}
+		} catch (error) {
+			return null;
+		}
+	};
 
-      if (response.ok) {
-        this.authToken = data.token;
-        this.currentUser = data.user;
-        return { success: true, user: data.user };
-      } else {
-        return { success: false, error: data.message || 'Login failed' };
-      }
-    } catch (error) {
-      return { success: false, error: 'Network error' };
-    }
-  }
+	// Authentication Methods
+	async login(credentials: LoginCredentials): Promise<{ success: boolean; user?: User; error?: string }> {
+		try {
+			const { token, sessionId, user, message } = await this.client.apiRequest(`/v1/auth/login`, RequestMethod.POST, credentials);
 
-  async register(userData: RegisterData): Promise<{ success: boolean; verificationId?: string; error?: string }> {
-    try {
-      const response = await fetch(`${this.client.baseURL}/v1/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
+			if (token) {
+				this.authToken = token;
+				this.currentUser = user;
 
-      const data = await response.json();
+				const expirationDate = new Date();
+				expirationDate.setDate(expirationDate.getDate() + 7);
 
-      if (response.ok) {
-        return { success: true, verificationId: data.verificationId };
-      } else {
-        return { success: false, error: data.message || 'Registration failed' };
-      }
-    } catch (error) {
-      return { success: false, error: 'Network error' };
-    }
-  }
+				await saveSecure("authToken", token, { encrypt: true, expiration: expirationDate });
+				return { success: true, user: user };
+			} else {
+				return { success: false, error: message || "Login failed" };
+			}
+		} catch (error: any) {
+			return { success: false, error: error.message || error || "Network error" };
+		}
+	}
 
-  async verifyEmail(email: string, code: string, verificationId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const response = await fetch(`${this.client.baseURL}/v1/auth/verify-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, code, verificationId }),
-      });
+	async register(userData: RegisterData): Promise<{ success: boolean; verificationId?: string; error?: string }> {
+		try {
+			const response = await fetch(`${this.client.baseURL}/v1/auth/register`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(userData),
+			});
 
-      const data = await response.json();
+			const data = await response.json();
 
-      if (response.ok) {
-        return { success: true };
-      } else {
-        return { success: false, error: data.message || 'Verification failed' };
-      }
-    } catch (error) {
-      return { success: false, error: 'Network error' };
-    }
-  }
+			if (response.ok) {
+				return { success: true, verificationId: data.verificationId };
+			} else {
+				return { success: false, error: data.message || "Registration failed" };
+			}
+		} catch (error) {
+			return { success: false, error: "Network error" };
+		}
+	}
 
-  async getCurrentUser(): Promise<{ success: boolean; user?: User; error?: string }> {
-    if (!this.authToken) {
-      return { success: false, error: 'Not authenticated' };
-    }
+	async verifyEmail(email: string, code: string, verificationId: string): Promise<{ success: boolean; error?: string }> {
+		try {
+			const response = await fetch(`${this.client.baseURL}/v1/auth/verify-email`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ email, code, verificationId }),
+			});
 
-    try {
-      const response = await fetch(`${this.client.baseURL}/v1/auth/me`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.authToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
+			const data = await response.json();
 
-      const data = await response.json();
+			if (response.ok) {
+				return { success: true };
+			} else {
+				return { success: false, error: data.message || "Verification failed" };
+			}
+		} catch (error) {
+			return { success: false, error: "Network error" };
+		}
+	}
 
-      if (response.ok) {
-        this.currentUser = data.user;
-        return { success: true, user: data.user };
-      } else {
-        return { success: false, error: data.message || 'Failed to get user' };
-      }
-    } catch (error) {
-      return { success: false, error: 'Network error' };
-    }
-  }
+	async getCurrentUser(): Promise<{ success: boolean; user?: User; error?: string }> {
+		if (!this.authToken) {
+			return { success: false, error: "Not authenticated" };
+		}
 
-  async logout(): Promise<{ success: boolean; error?: string }> {
-    if (!this.authToken) {
-      return { success: true };
-    }
+		try {
+			const response = await fetch(`${this.client.baseURL}/v1/auth/me`, {
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${this.authToken}`,
+					"Content-Type": "application/json",
+				},
+			});
 
-    try {
-      await fetch(`${this.client.baseURL}/v1/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.authToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
+			const data = await response.json();
 
-      this.authToken = null;
-      this.currentUser = null;
-      return { success: true };
-    } catch (error) {
-      // Clear local auth even if request fails
-      this.authToken = null;
-      this.currentUser = null;
-      return { success: true };
-    }
-  }
+			if (response.ok) {
+				this.currentUser = data.user;
+				return { success: true, user: data.user };
+			} else {
+				return { success: false, error: data.message || "Failed to get user" };
+			}
+		} catch (error) {
+			return { success: false, error: "Network error" };
+		}
+	}
 
-  // User Management Methods
-  async checkUsernameAvailability(username: string): Promise<{ available: boolean; error?: string }> {
-    try {
-      const response = await fetch(`${this.client.baseURL}/v1/auth/check-username`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username }),
-      });
+	async logout(): Promise<{ success: boolean; error?: string }> {
+		if (!this.authToken) {
+			return { success: true };
+		}
 
-      const data = await response.json();
-      return { available: data.available };
-    } catch (error) {
-      return { available: false, error: 'Network error' };
-    }
-  }
+		try {
+			await fetch(`${this.client.baseURL}/v1/auth/logout`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${this.authToken}`,
+					"Content-Type": "application/json",
+				},
+			});
 
-  async checkEmailAvailability(email: string): Promise<{ available: boolean; error?: string }> {
-    try {
-      const response = await fetch(`${this.client.baseURL}/v1/auth/check-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
+			this.authToken = null;
+			this.currentUser = null;
+			return { success: true };
+		} catch (error) {
+			// Clear local auth even if request fails
+			this.authToken = null;
+			this.currentUser = null;
+			return { success: true };
+		}
+	}
 
-      const data = await response.json();
-      return { available: data.available };
-    } catch (error) {
-      return { available: false, error: 'Network error' };
-    }
-  }
+	// User Management Methods
+	async checkUsernameAvailability(username: string): Promise<{ available: boolean; error?: string }> {
+		try {
+			const response = await fetch(`${this.client.baseURL}/v1/auth/check-username`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ username }),
+			});
 
-  async forgotPassword(email: string): Promise<{ success: boolean; resetId?: string; error?: string }> {
-    try {
-      const response = await fetch(`${this.client.baseURL}/v1/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
+			const data = await response.json();
+			return { available: data.available };
+		} catch (error) {
+			return { available: false, error: "Network error" };
+		}
+	}
 
-      const data = await response.json();
+	async checkEmailAvailability(email: string): Promise<{ available: boolean; error?: string }> {
+		try {
+			const response = await fetch(`${this.client.baseURL}/v1/auth/check-email`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ email }),
+			});
 
-      if (response.ok) {
-        return { success: true, resetId: data.resetId };
-      } else {
-        return { success: false, error: data.message || 'Failed to send reset code' };
-      }
-    } catch (error) {
-      return { success: false, error: 'Network error' };
-    }
-  }
+			const data = await response.json();
+			return { available: data.available };
+		} catch (error) {
+			return { available: false, error: "Network error" };
+		}
+	}
 
-  async resetPassword(email: string, code: string, resetId: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const response = await fetch(`${this.client.baseURL}/v1/auth/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, code, resetId, newPassword }),
-      });
+	async forgotPassword(email: string): Promise<{ success: boolean; resetId?: string; error?: string }> {
+		try {
+			const response = await fetch(`${this.client.baseURL}/v1/auth/forgot-password`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ email }),
+			});
 
-      const data = await response.json();
+			const data = await response.json();
 
-      if (response.ok) {
-        return { success: true };
-      } else {
-        return { success: false, error: data.message || 'Password reset failed' };
-      }
-    } catch (error) {
-      return { success: false, error: 'Network error' };
-    }
-  }
+			if (response.ok) {
+				return { success: true, resetId: data.resetId };
+			} else {
+				return { success: false, error: data.message || "Failed to send reset code" };
+			}
+		} catch (error) {
+			return { success: false, error: "Network error" };
+		}
+	}
 
-  // Getters
-  get user(): User | null {
-    return this.currentUser;
-  }
+	async resetPassword(email: string, code: string, resetId: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+		try {
+			const response = await fetch(`${this.client.baseURL}/v1/auth/reset-password`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ email, code, resetId, newPassword }),
+			});
 
-  get token(): string | null {
-    return this.authToken;
-  }
+			const data = await response.json();
 
-  get isAuthenticated(): boolean {
-    return !!this.authToken && !!this.currentUser;
-  }
+			if (response.ok) {
+				return { success: true };
+			} else {
+				return { success: false, error: data.message || "Password reset failed" };
+			}
+		} catch (error) {
+			return { success: false, error: "Network error" };
+		}
+	}
+
+	// Getters
+	get user(): User | null {
+		return this.currentUser;
+	}
+
+	get token(): string | null {
+		return this.authToken;
+	}
+
+	get isAuthenticated(): boolean {
+		return !!this.authToken && !!this.currentUser;
+	}
 }
 
 export default new AuthService();

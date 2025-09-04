@@ -1,5 +1,16 @@
 "use strict";
 /** @format */
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -37,6 +48,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.RequestMethod = void 0;
 var axios_1 = require("axios");
 var RequestMethod;
 (function (RequestMethod) {
@@ -46,36 +58,42 @@ var RequestMethod;
     RequestMethod["DELETE"] = "DELETE";
     RequestMethod["OPTION"] = "OPTION";
     RequestMethod["HEAD"] = "HEAD";
-})(RequestMethod || (RequestMethod = {}));
+})(RequestMethod = exports.RequestMethod || (exports.RequestMethod = {}));
 var DOPEClient = /** @class */ (function () {
     function DOPEClient() {
         var _this = this;
-        this.apiRequest = function (path, method, headers) {
+        this.apiRequest = function (path, method, data, headers) {
             if (method === void 0) { method = RequestMethod.GET; }
+            if (data === void 0) { data = {}; }
             if (headers === void 0) { headers = {}; }
             return __awaiter(_this, void 0, Promise, function () {
-                var data, error_1;
-                var _a;
-                return __generator(this, function (_b) {
-                    switch (_b.label) {
+                var res, error_1;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
                         case 0:
-                            _b.trys.push([0, 2, , 3]);
+                            _a.trys.push([0, 2, , 3]);
                             return [4 /*yield*/, this.client({
                                     url: path,
                                     method: method,
-                                    headers: headers,
+                                    data: data,
+                                    headers: __assign(__assign({}, headers), { "Content-Type": "application/json" }),
                                 })];
                         case 1:
-                            data = (_b.sent()).data;
-                            if (data.status === "ok") {
-                                return [2 /*return*/, data];
+                            res = _a.sent();
+                            if (!(res === null || res === void 0 ? void 0 : res.status)) {
+                                throw new Error("Undefined Status:", (res === null || res === void 0 ? void 0 : res.status) || 0);
                             }
-                            else {
-                                throw new Error(((_a = data === null || data === void 0 ? void 0 : data.error) === null || _a === void 0 ? void 0 : _a.message) || "API Request Failed");
+                            switch (res === null || res === void 0 ? void 0 : res.status) {
+                                case 200:
+                                    return [2 /*return*/, res.data];
+                                case 401:
+                                    throw new Error(res.data.message || "Unauthorized");
+                                default:
+                                    throw new Error(res.data.message || "An error occured");
                             }
                             return [3 /*break*/, 3];
                         case 2:
-                            error_1 = _b.sent();
+                            error_1 = _a.sent();
                             throw new Error(error_1.message || "Server Error");
                         case 3: return [2 /*return*/];
                     }
@@ -113,7 +131,7 @@ var DOPEClient = /** @class */ (function () {
         };
         this.client = axios_1.default.create({
             baseURL: "https://api.dopp.eu.org",
-            timeout: 60 * 1000
+            timeout: 60 * 1000,
         });
     }
     DOPEClient.getInstance = function () {

@@ -2,7 +2,7 @@
 
 import axios from "axios";
 
-enum RequestMethod {
+export enum RequestMethod {
 	GET = "GET",
 	POST = "POST",
 	PATCH = "PATCH",
@@ -14,12 +14,10 @@ enum RequestMethod {
 class DOPEClient {
 	private static instance: DOPEClient;
 
-	public baseURL = "https://api.dopp.eu.org";
-
 	private constructor() {
 		this.client = axios.create({
-			baseURL: this.baseURL,
-			timeout: 60 * 1000
+			baseURL: "https://api.dopp.eu.org",
+			timeout: 60 * 1000,
 		});
 	}
 
@@ -30,25 +28,33 @@ class DOPEClient {
 		return this.instance;
 	}
 
-	private apiRequest = async (path: string, method: RequestMethod = RequestMethod.GET, headers = {}): Promise<JSON> => {
+	public apiRequest = async (path: string, method: RequestMethod = RequestMethod.GET, data = {}, headers = {}): Promise<JSON> => {
 		try {
-			const { data } = await this.client({
+			const res = await this.client({
 				url: path,
 				method: method,
-				headers: headers,
+				data: data,
+				headers: { ...headers, "Content-Type": "application/json" },
 			});
+			
+			if (!res?.status) {
+			  throw new Error("Undefined Status:", res?.status || 0);
+			}
 
-			if (data.status === "ok") {
-				return data;
-			} else {
-				throw new Error(data?.error?.message || "API Request Failed");
+			switch (res?.status) {
+				case 200:
+					return res.data;
+				case 401:
+					throw new Error(res.data.message || "Unauthorized");
+				default:
+					throw new Error(res.data.message || "An error occured");
 			}
 		} catch (error) {
 			throw new Error(error.message || "Server Error");
 		}
 	};
 
-	getHomeFeed = async (limit = 10, random = true ): Promise<JSON> => {
+	getHomeFeed = async (limit = 10, random = true): Promise<JSON> => {
 		try {
 			const result = await this.apiRequest(`/v1/posts?limit=${limit}&random=${random}`);
 			if (result && result.posts) {

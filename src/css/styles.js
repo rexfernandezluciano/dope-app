@@ -1,13 +1,12 @@
 /** @format */
 
-import { StyleSheet } from "react-native";
+import { StyleSheet, Dimensions } from "react-native";
+const { width, height } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
 	home: {
 		flex: 1,
-		justifyContent: "flex-start",
-		alignItems: "flex-start",
-		backgroundColor: "#f5f5f5",
+		backgroundColor: "#ffffff",
 	},
 	bold: {
 		fontWeight: "bold",
@@ -36,16 +35,14 @@ const styles = StyleSheet.create({
 	},
 	// Post Card Styles
 	postCard: {
-		marginBottom: 12,
 		borderRadius: 0,
-		elevation: 2,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-		backgroundColor: "white",
+		elevation: 0,
+		borderBottomWidth: 1,
+		borderBottomColor: "#eeeeee",
+		backgroundColor: "#ffffff",
+		shadowRadius: 0
 	},
-	postHeader: {
+	posHeader: {
 		flexDirection: "row",
 		alignItems: "center",
 		marginBottom: 12,
@@ -77,10 +74,9 @@ const styles = StyleSheet.create({
 	repostIndicator: {
 		flexDirection: "row",
 		alignItems: "center",
-		marginBottom: 8,
 	},
 	repostText: {
-		fontSize: 12,
+		fontSize: 10,
 		color: "#657786",
 		fontStyle: "italic",
 	},
@@ -144,9 +140,11 @@ const styles = StyleSheet.create({
 	},
 	// Poll Styles
 	pollContainer: {
-		backgroundColor: "#f8f9fa",
+		backgroundColor: "#ffffff",
+		border: 1,
+		borderColor: "#eeeeee",
 		padding: 16,
-		borderRadius: 12,
+		borderRadius: 3,
 		marginBottom: 12,
 	},
 	pollQuestion: {
@@ -165,7 +163,7 @@ const styles = StyleSheet.create({
 		position: "relative",
 	},
 	pollOptionSelected: {
-		borderColor: "#1DA1F2",
+		borderColor: "#0069b5",
 		borderWidth: 2,
 	},
 	pollOptionContent: {
@@ -209,7 +207,11 @@ const styles = StyleSheet.create({
 	// Original Post (Repost) Styles
 	originalPostCard: {
 		marginBottom: 12,
-		backgroundColor: "#f8f9fa",
+		backgroundColor: "#ffffff",
+		border: 1,
+		borderColor: "#eeeeee",
+		borderRadius: 3,
+		elevation: 0,
 	},
 	originalPostHeader: {
 		flexDirection: "row",
@@ -221,6 +223,7 @@ const styles = StyleSheet.create({
 		fontWeight: "600",
 		color: "#1a1a1a",
 		marginLeft: 8,
+		paddingLeft: 0
 	},
 	originalPostUsername: {
 		fontSize: 12,
@@ -281,63 +284,369 @@ const styles = StyleSheet.create({
 		elevation: 0,
 		backgroundColor: "#f8f9fa",
 	},
-	filterContainer: {
+	headerContainer: {
 		flexDirection: "row",
-		marginBottom: 8,
-		flexWrap: "wrap",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingHorizontal: 16,
+		paddingTop: 32,
+		paddingBottom: 12,
+		backgroundColor: "#FFFFFF",
+		borderBottomWidth: 1,
+		borderBottomColor: "#E1E8ED",
+		width: "100%",
 	},
-	filterChip: {
-		marginRight: 8,
-		marginBottom: 4,
-		backgroundColor: "#f8f9fa",
+	headerTitle: {
+		fontSize: 20,
+		fontWeight: "700",
+		color: "#14171A",
+		letterSpacing: 0.5,
 	},
-	filterChipActive: {
-		backgroundColor: "#1DA1F2",
+	headerActions: {
+	  flexDirection: "row",
+	  alignItems: "center",
+	  gap: 2
 	},
+	filterButton: {
+		backgroundColor: "#F7F9FA",
+		borderRadius: 20,
+	},
+	// Tab navigation styles
+	tabBar: {
+		backgroundColor: "#FFFFFF",
+		elevation: 0,
+		shadowOpacity: 0,
+		borderBottomWidth: 1,
+		borderBottomColor: "#E1E8ED",
+	},
+
+	tabIndicator: {
+		backgroundColor: "#0069b5",
+		height: 3,
+		borderRadius: 1.5,
+	},
+
+	tabLabel: {
+		fontSize: 16,
+		fontWeight: "600",
+		textTransform: "none",
+		letterSpacing: 0.25,
+	},
+
+	sceneContainer: {
+		flex: 1,
+		backgroundColor: "#FFFFFF",
+	},
+
+	// Post list styles
+	postList: {
+		paddingBottom: 100, // Space for FAB
+	},
+
+	// Loading state styles
 	loadingContainer: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
-		backgroundColor: "#f5f5f5",
+		backgroundColor: "#FFFFFF",
 	},
+
 	loadingText: {
 		fontSize: 16,
 		color: "#657786",
+		fontWeight: "500",
 	},
-	emptyContainer: {
-		flexGrow: 1,
-	},
+
+	// Empty state styles
 	emptyState: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
-		padding: 32,
+		paddingHorizontal: 32,
+		paddingVertical: 64,
 	},
+
 	emptyStateTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#1a1a1a",
+		fontSize: 22,
+		fontWeight: "700",
+		color: "#14171A",
 		textAlign: "center",
-		marginBottom: 8,
+		marginBottom: 12,
+		lineHeight: 28,
 	},
+
 	emptyStateSubtitle: {
-		fontSize: 14,
+		fontSize: 16,
 		color: "#657786",
 		textAlign: "center",
-		lineHeight: 20,
+		lineHeight: 22,
+		maxWidth: 280,
 	},
+
+	emptyContainer: {
+		flexGrow: 1,
+		justifyContent: "center",
+	},
+
+	// Modal styles
+	modalContainer: {
+		flex: 1,
+		justifyContent: "flex-end",
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+	},
+
+	modalSurface: {
+		backgroundColor: "#FFFFFF",
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
+		maxHeight: height * 0.85,
+		elevation: 8,
+		shadowColor: "#000",
+		shadowOffset: {
+			width: 0,
+			height: -2,
+		},
+		shadowOpacity: 0.25,
+		shadowRadius: 8,
+	},
+
+	modalHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingHorizontal: 20,
+		paddingVertical: 16,
+		backgroundColor: "#FFFFFF",
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
+	},
+
+	modalTitle: {
+		fontSize: 20,
+		fontWeight: "700",
+		color: "#14171A",
+		letterSpacing: 0.5,
+	},
+
+	// Filter section styles
+	filterSection: {
+		paddingHorizontal: 20,
+		paddingVertical: 16,
+	},
+
+	filterSectionTitle: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#14171A",
+		marginBottom: 12,
+		letterSpacing: 0.25,
+	},
+
+	filterChipContainer: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 8,
+	},
+
+	filterChip: {
+		marginRight: 8,
+		marginBottom: 8,
+		backgroundColor: "#F7F9FA",
+		borderWidth: 1,
+		borderColor: "#E1E8ED",
+	},
+
+	// Modal action styles
+	modalActions: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		paddingHorizontal: 20,
+		paddingVertical: 20,
+		backgroundColor: "#F7F9FA",
+		borderTopWidth: 1,
+		borderTopColor: "#E1E8ED",
+	},
+
+	modalButton: {
+		flex: 1,
+		marginHorizontal: 8,
+	},
+
+	// FAB styles
 	fab: {
 		position: "absolute",
-		margin: 16,
-		right: 0,
-		bottom: 0,
-		backgroundColor: "#1DA1F2",
+		right: 16,
+		bottom: 20,
+		backgroundColor: "#0069b5",
+		elevation: 8,
+		shadowColor: "#1DA1F2",
+		shadowOffset: {
+			width: 0,
+			height: 4,
+		},
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		color: "#ffffff"
 	},
-	card: {
-		backgroundColor: "#ffffff",
-		borderRadius: 0,
-		boxShadow: "none",
-		elevation: 0
+
+	// Additional utility styles
+	divider: {
+		backgroundColor: "#E1E8ED",
+		height: 1,
+	},
+
+	// Responsive styles for different screen sizes
+	"@media (max-width: 768)": {
+		headerContainer: {
+			paddingHorizontal: 12,
+		},
+
+		modalSurface: {
+			maxHeight: height * 0.9,
+		},
+
+		filterSection: {
+			paddingHorizontal: 16,
+		},
+
+		modalActions: {
+			paddingHorizontal: 16,
+		},
+	},
+
+	// Dark mode support (optional)
+	"@media (prefers-color-scheme: dark)": {
+		home: {
+			backgroundColor: "#15202B",
+		},
+
+		headerContainer: {
+			backgroundColor: "#15202B",
+			borderBottomColor: "#38444D",
+		},
+
+		headerTitle: {
+			color: "#FFFFFF",
+		},
+
+		tabBar: {
+			backgroundColor: "#15202B",
+			borderBottomColor: "#38444D",
+		},
+
+		sceneContainer: {
+			backgroundColor: "#15202B",
+		},
+
+		loadingContainer: {
+			backgroundColor: "#15202B",
+		},
+
+		loadingText: {
+			color: "#8B98A5",
+		},
+
+		emptyStateTitle: {
+			color: "#FFFFFF",
+		},
+
+		emptyStateSubtitle: {
+			color: "#8B98A5",
+		},
+
+		modalSurface: {
+			backgroundColor: "#1C2938",
+		},
+
+		modalHeader: {
+			backgroundColor: "#1C2938",
+		},
+
+		modalTitle: {
+			color: "#FFFFFF",
+		},
+
+		filterSectionTitle: {
+			color: "#FFFFFF",
+		},
+
+		filterChip: {
+			backgroundColor: "#253341",
+			borderColor: "#38444D",
+		},
+
+		modalActions: {
+			backgroundColor: "#192734",
+			borderTopColor: "#38444D",
+		},
+	},
+	container: {
+		flexGrow: 1,
+		justifyContent: "center",
+		padding: 20,
+		backgroundColor: "#f5f5f5",
+	},
+	formContainer: {
+		backgroundColor: "#fff",
+	},
+	input: {
+		marginBottom: 15,
+		backgroundColor: "transparent",
+	},
+	button: {
+		marginTop: 15,
+		marginBottom: 10,
+	},
+	backButton: {
+		marginTop: 5,
+		marginBottom: 10,
+	},
+	skipButton: {
+		marginTop: 5,
+		marginBottom: 10,
+	},
+	errorText: {
+		color: "red",
+		marginBottom: 10,
+	},
+	loginText: {
+		textAlign: "center",
+		marginTop: 20,
+		color: "#0069b5",
+	},
+	label: {
+		fontSize: 16,
+		marginBottom: 5,
+		color: "#333",
+	},
+	datePickerButton: {
+		marginBottom: 15,
+		borderWidth: 1,
+		borderColor: "#ccc",
+		borderRadius: 4,
+		alignItems: "flex-start",
+	},
+	selectContainer: {
+		position: "relative",
+		marginBottom: 15,
+	},
+	genderOptions: {
+		position: "absolute",
+		top: "100%",
+		left: 0,
+		right: 0,
+		backgroundColor: "#fff",
+		borderRadius: 4,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+		elevation: 3,
+		zIndex: 1,
+		padding: 10,
+	},
+	genderOptionButton: {
+		marginVertical: 5,
 	},
 });
 

@@ -1,8 +1,9 @@
 /** @format */
 
-import DOPEClient, { RequestMethod } from "../api/config/DOPEClient";
-import { saveSecure, getSecure } from "../utils/storage.utils.ts";
+import DOPEClient, { RequestMethod, DOPEClientError, ApiResponse } from "../api/config/DOPEClient";
+import { saveSecure, getSecure, removeSecure } from "../utils/storage.utils";
 
+// Enhanced types with better structure
 export interface User {
 	uid: string;
 	name: string;
@@ -48,258 +49,571 @@ export interface RegisterData {
 	password: string;
 	photoURL?: string;
 	coverPhotoURL?: string;
-	gender?: "male" | "female" | "non_binary" | "prefer_not_to_say";
+	gender?: User["gender"];
 	birthday?: string;
-	subscription?: "free" | "premium" | "pro";
-	privacy?: {
-		profile: "public" | "private";
-		comments: "public" | "followers" | "private";
-		sharing: boolean;
-		chat: "public" | "followers" | "private";
-	};
+	subscription?: User["membership"]["subscription"];
+	privacy?: Partial<User["privacy"]>;
 }
 
+export interface AuthResponse<T = any> {
+	success: boolean;
+	data?: T;
+	error?: string;
+	message?: string;
+}
+
+export interface AuthTokenData {
+	token: string;
+	user: User;
+	sessionId?: string;
+}
+
+export interface AvailabilityResponse {
+	available: boolean;
+	error?: string;
+}
+
+// Auth state change listener type
+export type AuthStateListener = (user: User | null) => void;
+
 class AuthService {
+	private static instance: AuthService;
 	private client: DOPEClient;
 	private currentUser: User | null = null;
 	private authToken: string | null = null;
+	private initializationPromise: Promise<void> | null = null;
+	private authStateListeners: Set<AuthStateListener> = new Set();
 
-	constructor() {
+	// Constants
+	private static readonly TOKEN_STORAGE_KEY = "authToken";
+	private static readonly TOKEN_EXPIRY_DAYS = 7;
+	private static readonly API_ENDPOINTS = {
+		LOGIN: "/v1/auth/login",
+		REGISTER: "/v1/auth/register",
+		VERIFY_EMAIL: "/v1/auth/verify-email",
+		ME: "/v1/auth/me",
+		LOGOUT: "/v1/auth/logout",
+		CHECK_USERNAME: "/v1/auth/check-username",
+		CHECK_EMAIL: "/v1/auth/check-email",
+		FORGOT_PASSWORD: "/v1/auth/forgot-password",
+		RESET_PASSWORD: "/v1/auth/reset-password",
+	} as const;
+
+	private constructor() {
 		this.client = DOPEClient.getInstance();
-		this.fecthAuth()
-			.then(data => console.log("success"))
-			.catch(err => console.error("failed"));
+		this.initialize();
 	}
 
-	private fecthAuth = async () => {
+	public static getInstance(): AuthService {
+		if (!AuthService.instance) {
+			AuthService.instance = new AuthService();
+		}
+		return AuthService.instance;
+	}
+
+	/**
+	 * Initialize the authentication service by checking for stored tokens
+	 */
+	private initialize(): void {
+		if (this.initializationPromise) {
+			return;
+		}
+
+		this.initializationPromise = this.restoreAuthState()
+			.then(() => {
+				console.log("AuthService initialized successfully");
+			})
+			.catch(error => {
+				console.error("AuthService initialization failed:", error);
+				this.clearAuthState();
+			});
+	}
+
+	/**
+	 * Restore authentication state from secure storage
+	 */
+	private async restoreAuthState(): Promise<void> {
 		try {
-			const token = await getSecure("authToken", { encrypt: true });
+			const token = await getSecure(AuthService.TOKEN_STORAGE_KEY, { encrypt: true });
 			if (!token) {
-				return null;
+				return;
 			}
 
-			const me = await this.apiRequest("/v1/auth/me", RequestMethod.GET, {}, { Authorization: `Bearer ${this.authToken}` });
-			if (me.status === "ok") {
-				this.authToken = token;
-				this.currentUser = me.user;
-				return me.user;
+			this.authToken = token;
+			const userResponse = await this.fetchCurrentUser();
+
+			if (userResponse.success && userResponse.data) {
+				this.currentUser = userResponse.data;
+				this.notifyAuthStateChange(userResponse.data);
 			} else {
-				return null;
+				// Token is invalid, clear it
+				await this.clearStoredToken();
+				this.clearAuthState();
 			}
 		} catch (error) {
-			return null;
-		}
-	};
-
-	// Authentication Methods
-	async login(credentials: LoginCredentials): Promise<{ success: boolean; user?: User; error?: string }> {
-		try {
-			const { token, sessionId, user, message } = await this.client.apiRequest(`/v1/auth/login`, RequestMethod.POST, credentials);
-
-			if (token) {
-				this.authToken = token;
-				this.currentUser = user;
-
-				const expirationDate = new Date();
-				expirationDate.setDate(expirationDate.getDate() + 7);
-
-				await saveSecure("authToken", token, { encrypt: true, expiration: expirationDate });
-				return { success: true, user: user };
-			} else {
-				return { success: false, error: message || "Login failed" };
-			}
-		} catch (error: any) {
-			return { success: false, error: error.message || error || "Network error" };
+			console.error("Failed to restore auth state:", error);
+			await this.clearStoredToken();
+			this.clearAuthState();
 		}
 	}
 
-	async register(userData: RegisterData): Promise<{ success: boolean; verificationId?: string; error?: string }> {
-		try {
-			const response = await fetch(`${this.client.baseURL}/v1/auth/register`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(userData),
-			});
-
-			const data = await response.json();
-
-			if (response.ok) {
-				return { success: true, verificationId: data.verificationId };
-			} else {
-				return { success: false, error: data.message || "Registration failed" };
-			}
-		} catch (error) {
-			return { success: false, error: "Network error" };
-		}
-	}
-
-	async verifyEmail(email: string, code: string, verificationId: string): Promise<{ success: boolean; error?: string }> {
-		try {
-			const response = await fetch(`${this.client.baseURL}/v1/auth/verify-email`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ email, code, verificationId }),
-			});
-
-			const data = await response.json();
-
-			if (response.ok) {
-				return { success: true };
-			} else {
-				return { success: false, error: data.message || "Verification failed" };
-			}
-		} catch (error) {
-			return { success: false, error: "Network error" };
-		}
-	}
-
-	async getCurrentUser(): Promise<{ success: boolean; user?: User; error?: string }> {
+	/**
+	 * Fetch current user information from the API
+	 */
+	private async fetchCurrentUser(): Promise<AuthResponse<User>> {
 		if (!this.authToken) {
-			return { success: false, error: "Not authenticated" };
+			return { success: false, error: "No authentication token available" };
 		}
 
 		try {
-			const response = await fetch(`${this.client.baseURL}/v1/auth/me`, {
-				method: "GET",
-				headers: {
-					Authorization: `Bearer ${this.authToken}`,
-					"Content-Type": "application/json",
-				},
+			const response = await this.client.get<{
+				status: string;
+				user: User;
+				message?: string;
+			}>(AuthService.API_ENDPOINTS.ME, undefined, {
+				headers: { Authorization: `Bearer ${this.authToken}` },
 			});
 
-			const data = await response.json();
+			if (response.success && response.data.status === "ok" && response.data.user) {
+				return { success: true, data: response.data.user };
+			}
 
-			if (response.ok) {
-				this.currentUser = data.user;
-				return { success: true, user: data.user };
-			} else {
-				return { success: false, error: data.message || "Failed to get user" };
+			return { success: false, error: response.data.message || "Failed to fetch user data" };
+		} catch (error) {
+			console.error("Error fetching current user:", error);
+
+			if (error instanceof DOPEClientError) {
+				// Handle specific authentication errors
+				if (error.status === 401) {
+					// Token expired or invalid, clear auth state
+					await this.clearStoredToken();
+					this.clearAuthState();
+					return { success: false, error: "Authentication expired. Please log in again." };
+				}
+			}
+
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : "Network error occurred",
+			};
+		}
+	}
+
+	/**
+	 * Handle API errors with enhanced context
+	 */
+	private handleApiError(error: unknown, context: string): AuthResponse {
+		console.error(`AuthService ${context} error:`, error);
+
+		if (error instanceof DOPEClientError) {
+			switch (error.status) {
+				case 400:
+					return { success: false, error: error.message || "Invalid request data" };
+				case 401:
+					return { success: false, error: "Invalid credentials or session expired" };
+				case 403:
+					return { success: false, error: "Access denied" };
+				case 404:
+					return { success: false, error: "Service not found" };
+				case 409:
+					return { success: false, error: error.message || "Conflict - resource already exists" };
+				case 422:
+					return { success: false, error: error.message || "Invalid input data" };
+				case 429:
+					return { success: false, error: "Too many attempts. Please try again later." };
+				case 500:
+				case 502:
+				case 503:
+				case 504:
+					return { success: false, error: "Server error. Please try again later." };
+				default:
+					return { success: false, error: error.message || `Error during ${context}` };
+			}
+		}
+
+		if (error instanceof Error) {
+			return {
+				success: false,
+				error: error.message.includes("NETWORK_ERROR") ? "Network connection error. Please check your internet connection." : error.message,
+			};
+		}
+
+		return { success: false, error: `An unexpected error occurred during ${context}` };
+	}
+
+	/**
+	 * Store authentication token securely
+	 */
+	private async storeAuthToken(token: string): Promise<void> {
+		const expirationDate = new Date();
+		expirationDate.setDate(expirationDate.getDate() + AuthService.TOKEN_EXPIRY_DAYS);
+
+		await saveSecure(AuthService.TOKEN_STORAGE_KEY, token, {
+			encrypt: true,
+			expiration: expirationDate,
+		});
+	}
+
+	/**
+	 * Clear stored authentication token
+	 */
+	private async clearStoredToken(): Promise<void> {
+		try {
+			await removeSecure(AuthService.TOKEN_STORAGE_KEY);
+		} catch (error) {
+			console.warn("Failed to clear stored token:", error);
+		}
+	}
+
+	/**
+	 * Clear local authentication state
+	 */
+	private clearAuthState(): void {
+		this.authToken = null;
+		this.currentUser = null;
+		this.notifyAuthStateChange(null);
+	}
+
+	/**
+	 * Notify all listeners of authentication state changes
+	 */
+	private notifyAuthStateChange(user: User | null): void {
+		this.authStateListeners.forEach(listener => {
+			try {
+				listener(user);
+			} catch (error) {
+				console.error("Auth state listener error:", error);
+			}
+		});
+	}
+
+	/**
+	 * Wait for initialization to complete
+	 */
+	public async waitForInitialization(): Promise<void> {
+		if (this.initializationPromise) {
+			await this.initializationPromise;
+		}
+	}
+
+	/**
+	 * User authentication with credentials
+	 */
+	public async login(credentials: LoginCredentials): Promise<AuthResponse<User>> {
+		try {
+			const response = await this.client.post<{
+				token: string;
+				user: User;
+				sessionId?: string;
+				message?: string;
+			}>(AuthService.API_ENDPOINTS.LOGIN, credentials);
+
+			if (response.success && response.data.token && response.data.user) {
+				this.authToken = response.data.token;
+				this.currentUser = response.data.user;
+
+				await this.storeAuthToken(response.data.token);
+				this.notifyAuthStateChange(response.data.user);
+
+				return { success: true, data: response.data.user };
+			}
+
+			return {
+				success: false,
+				error: response.data.message || "Invalid credentials provided",
+			};
+		} catch (error) {
+			return this.handleApiError(error, "login");
+		}
+	}
+
+	/**
+	 * User registration
+	 */
+	public async register(userData: RegisterData): Promise<AuthResponse<{ verificationId: string }>> {
+		try {
+			const response = await this.client.post<{
+				verificationId: string;
+				message?: string;
+			}>(AuthService.API_ENDPOINTS.REGISTER, userData);
+
+			if (response.success && response.data.verificationId) {
+				return {
+					success: true,
+					data: { verificationId: response.data.verificationId },
+				};
+			}
+
+			return {
+				success: false,
+				error: response.data.message || "Registration failed",
+			};
+		} catch (error) {
+			return this.handleApiError(error, "registration");
+		}
+	}
+
+	/**
+	 * Email verification
+	 */
+	public async verifyEmail(email: string, code: string, verificationId: string): Promise<AuthResponse<void>> {
+		try {
+			const response = await this.client.post<{
+				success: boolean;
+				message?: string;
+			}>(AuthService.API_ENDPOINTS.VERIFY_EMAIL, { email, code, verificationId });
+
+			return response.success && response.data.success ? { success: true } : { success: false, error: response.data.message || "Email verification failed" };
+		} catch (error) {
+			return this.handleApiError(error, "email verification");
+		}
+	}
+
+	/**
+	 * Get current authenticated user
+	 */
+	public async getCurrentUser(): Promise<AuthResponse<User>> {
+		await this.waitForInitialization();
+
+		if (!this.isAuthenticated) {
+			return { success: false, error: "User not authenticated" };
+		}
+
+		if (this.currentUser) {
+			return { success: true, data: this.currentUser };
+		}
+
+		return await this.fetchCurrentUser();
+	}
+
+	/**
+	 * User logout
+	 */
+	public async logout(): Promise<AuthResponse<void>> {
+		try {
+			if (this.authToken) {
+				await this.client.post<any>(
+					AuthService.API_ENDPOINTS.LOGOUT,
+					{},
+					{
+						headers: { Authorization: `Bearer ${this.authToken}` },
+						timeout: 5000, // Short timeout for logout
+					},
+				);
 			}
 		} catch (error) {
-			return { success: false, error: "Network error" };
+			console.warn("Logout API call failed:", error);
+		} finally {
+			// Always clear local state regardless of API response
+			await this.clearStoredToken();
+			this.clearAuthState();
 		}
+
+		return { success: true };
 	}
 
-	async logout(): Promise<{ success: boolean; error?: string }> {
-		if (!this.authToken) {
-			return { success: true };
+	/**
+	 * Check username availability
+	 */
+	public async checkUsernameAvailability(username: string): Promise<AvailabilityResponse> {
+		if (!username.trim()) {
+			return { available: false, error: "Username cannot be empty" };
 		}
 
 		try {
-			await fetch(`${this.client.baseURL}/v1/auth/logout`, {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${this.authToken}`,
-					"Content-Type": "application/json",
-				},
-			});
+			const response = await this.client.post<{
+				available: boolean;
+				message?: string;
+			}>(AuthService.API_ENDPOINTS.CHECK_USERNAME, { username });
 
-			this.authToken = null;
-			this.currentUser = null;
-			return { success: true };
+			return { available: response.data.available };
 		} catch (error) {
-			// Clear local auth even if request fails
-			this.authToken = null;
-			this.currentUser = null;
-			return { success: true };
+			console.error("Username availability check error:", error);
+			return {
+				available: false,
+				error: error instanceof Error ? error.message : "Availability check failed",
+			};
 		}
 	}
 
-	// User Management Methods
-	async checkUsernameAvailability(username: string): Promise<{ available: boolean; error?: string }> {
-		try {
-			const response = await fetch(`${this.client.baseURL}/v1/auth/check-username`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ username }),
-			});
+	/**
+	 * Check email availability
+	 */
+	public async checkEmailAvailability(email: string): Promise<AvailabilityResponse> {
+		if (!email.trim()) {
+			return { available: false, error: "Email cannot be empty" };
+		}
 
-			const data = await response.json();
-			return { available: data.available };
+		try {
+			const response = await this.client.post<{
+				available: boolean;
+				message?: string;
+			}>(AuthService.API_ENDPOINTS.CHECK_EMAIL, { email });
+
+			return { available: response.data.available };
 		} catch (error) {
-			return { available: false, error: "Network error" };
+			console.error("Email availability check error:", error);
+			return {
+				available: false,
+				error: error instanceof Error ? error.message : "Availability check failed",
+			};
 		}
 	}
 
-	async checkEmailAvailability(email: string): Promise<{ available: boolean; error?: string }> {
-		try {
-			const response = await fetch(`${this.client.baseURL}/v1/auth/check-email`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ email }),
-			});
-
-			const data = await response.json();
-			return { available: data.available };
-		} catch (error) {
-			return { available: false, error: "Network error" };
+	/**
+	 * Initiate password reset
+	 */
+	public async forgotPassword(email: string): Promise<AuthResponse<{ resetId: string }>> {
+		if (!email.trim()) {
+			return { success: false, error: "Email address is required" };
 		}
-	}
 
-	async forgotPassword(email: string): Promise<{ success: boolean; resetId?: string; error?: string }> {
 		try {
-			const response = await fetch(`${this.client.baseURL}/v1/auth/forgot-password`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ email }),
-			});
+			const response = await this.client.post<{
+				resetId: string;
+				message?: string;
+			}>(AuthService.API_ENDPOINTS.FORGOT_PASSWORD, { email });
 
-			const data = await response.json();
-
-			if (response.ok) {
-				return { success: true, resetId: data.resetId };
-			} else {
-				return { success: false, error: data.message || "Failed to send reset code" };
+			if (response.success && response.data.resetId) {
+				return { success: true, data: { resetId: response.data.resetId } };
 			}
+
+			return {
+				success: false,
+				error: response.data.message || "Failed to initiate password reset",
+			};
 		} catch (error) {
-			return { success: false, error: "Network error" };
+			return this.handleApiError(error, "password reset initiation");
 		}
 	}
 
-	async resetPassword(email: string, code: string, resetId: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+	/**
+	 * Complete password reset
+	 */
+	public async resetPassword(email: string, code: string, resetId: string, newPassword: string): Promise<AuthResponse<void>> {
+		if (!email.trim() || !code.trim() || !resetId.trim() || !newPassword.trim()) {
+			return { success: false, error: "All fields are required for password reset" };
+		}
+
 		try {
-			const response = await fetch(`${this.client.baseURL}/v1/auth/reset-password`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ email, code, resetId, newPassword }),
+			const response = await this.client.post<{
+				success: boolean;
+				message?: string;
+			}>(AuthService.API_ENDPOINTS.RESET_PASSWORD, {
+				email,
+				code,
+				resetId,
+				newPassword,
 			});
 
-			const data = await response.json();
-
-			if (response.ok) {
-				return { success: true };
-			} else {
-				return { success: false, error: data.message || "Password reset failed" };
-			}
+			return response.success && response.data.success ? { success: true } : { success: false, error: response.data.message || "Password reset failed" };
 		} catch (error) {
-			return { success: false, error: "Network error" };
+			return this.handleApiError(error, "password reset");
 		}
 	}
 
-	// Getters
-	get user(): User | null {
+	/**
+	 * Refresh user data from server
+	 */
+	public async refreshUserData(): Promise<AuthResponse<User>> {
+		if (!this.isAuthenticated) {
+			return { success: false, error: "User not authenticated" };
+		}
+
+		try {
+			const userResponse = await this.fetchCurrentUser();
+			if (userResponse.success && userResponse.data) {
+				this.currentUser = userResponse.data;
+				this.notifyAuthStateChange(userResponse.data);
+				return { success: true, data: userResponse.data };
+			}
+
+			return userResponse;
+		} catch (error) {
+			return this.handleApiError(error, "user data refresh");
+		}
+	}
+
+	/**
+	 * Update authentication headers for subsequent requests
+	 */
+	public updateAuthHeaders(): void {
+		if (this.authToken) {
+			this.client.setDefaultHeader("Authorization", `Bearer ${this.authToken}`);
+		} else {
+			this.client.removeDefaultHeader("Authorization");
+		}
+	}
+
+	/**
+	 * Subscribe to authentication state changes
+	 */
+	public onAuthStateChanged(listener: AuthStateListener): () => void {
+		this.authStateListeners.add(listener);
+
+		// Immediately call with current state
+		listener(this.currentUser);
+
+		// Return unsubscribe function
+		return () => {
+			this.authStateListeners.delete(listener);
+		};
+	}
+
+	/**
+	 * Check authentication status asynchronously
+	 */
+	public async checkAuthStatus(): Promise<boolean> {
+		await this.waitForInitialization();
+		return this.isAuthenticated;
+	}
+
+	/**
+	 * Validate current session by making a request to the server
+	 */
+	public async validateSession(): Promise<boolean> {
+		if (!this.isAuthenticated) {
+			return false;
+		}
+
+		try {
+			const userResponse = await this.fetchCurrentUser();
+			if (!userResponse.success) {
+				// Session is invalid, clear auth state
+				await this.clearStoredToken();
+				this.clearAuthState();
+				return false;
+			}
+
+			return true;
+		} catch (error) {
+			console.error("Session validation failed:", error);
+			return false;
+		}
+	}
+
+	// Public getters
+	public get user(): User | null {
 		return this.currentUser;
 	}
 
-	get token(): string | null {
+	public get token(): string | null {
 		return this.authToken;
 	}
 
-	get isAuthenticated(): boolean {
-		return !!this.authToken && !!this.currentUser;
+	public get isAuthenticated(): boolean {
+		return Boolean(this.authToken && this.currentUser);
+	}
+
+	public get isInitialized(): boolean {
+		return (
+			this.initializationPromise === null ||
+			this.initializationPromise.then(
+				() => true,
+				() => false,
+			)
+		);
 	}
 }
 
-export default new AuthService();
+export default AuthService.getInstance();

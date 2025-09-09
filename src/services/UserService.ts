@@ -31,7 +31,7 @@ class UserService {
 
   async getUserProfile(userId: string): Promise<{ success: boolean; user?: any; error?: string }> {
     try {
-      const response = await fetch(`${this.client.baseURL}/v1/users/${userId}`, {
+      const response = await fetch(`${this.client.baseURL}/v1/users/find/${userId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

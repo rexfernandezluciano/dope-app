@@ -74,7 +74,7 @@ const BusinessPage = () => {
   }
 
   return (
-    <ScrollView style={styles.home} contentContainerStyle={{ padding: 16, alignItems: "center", justifyContent: "center" }}>
+    <ScrollView contentContainerStyle={[styles.home, { padding: 16, alignItems: "center", justifyContent: "center" }]}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 24 }}>
         <Text style={styles.h1}>Business Profile</Text>
         <Button

@@ -110,7 +110,7 @@ const OAuthPage = () => {
   }
 
   return (
-    <ScrollView style={styles.home} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView contentContainerStyle={[styles.home, { padding: 16 }]}>
       <Text style={[styles.h1, { marginBottom: 24 }]}>Connected Apps & Services</Text>
 
       {/* Connected Apps */}

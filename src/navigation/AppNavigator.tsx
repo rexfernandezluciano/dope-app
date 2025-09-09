@@ -1,7 +1,6 @@
-
 /** @format */
 
-import React from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { NavigationContainer } from "@react-navigation/native";
@@ -16,83 +15,235 @@ import AnalyticsPage from "../pages/AnalyticsPage";
 import BusinessPage from "../pages/BusinessPage";
 import SubscriptionPage from "../pages/SubscriptionPage";
 import OAuthPage from "../pages/OAuthPage";
+import SearchPage from "../pages/SearchPage";
 
 // Import services
 import AuthService from "../services/AuthService";
 
+// Types for better type safety
+type TabIconName = "home-variant" | "account" | "chart-line" | "briefcase" | "crown" | "link";
+
+interface TabIconProps {
+	focused: boolean;
+	color: string;
+	size: number;
+}
+
+interface RouteParams {
+	route: {
+		name: string;
+	};
+}
+
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const MainTabNavigator = () => {
-  return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: string;
+// Configuration constants
+const TAB_CONFIG = {
+	activeTintColor: "#0069b5",
+	inactiveTintColor: "#6B7280",
+	iconSize: 24,
+} as const;
 
-          switch (route.name) {
-            case "Home":
-              iconName = "home";
-              break;
-            case "Profile":
-              iconName = "account";
-              break;
-            case "Analytics":
-              iconName = "chart-line";
-              break;
-            case "Business":
-              iconName = "briefcase";
-              break;
-            case "Subscription":
-              iconName = "crown";
-              break;
-            case "OAuth":
-              iconName = "link";
-              break;
-            default:
-              iconName = "home";
-          }
+const ICON_MAP: Record<string, TabIconName> = {
+	home: "home-variant",
+	profile: "account",
+	analytics: "chart-line",
+	business: "briefcase",
+	subscription: "crown",
+	oauth: "link",
+} as const;
 
-          return <IconButton icon={iconName} size={size} iconColor={color} />;
-        },
-        tabBarActiveTintColor: "#1DA1F2",
-        tabBarInactiveTintColor: "gray",
-        headerShown: false,
-      })}
-    >
-      <Tab.Screen name="Home" component={HomePage} />
-      <Tab.Screen name="Profile" component={ProfilePage} />
-      <Tab.Screen name="Analytics" component={AnalyticsPage} />
-      <Tab.Screen name="Business" component={BusinessPage} />
-      <Tab.Screen name="Subscription" component={SubscriptionPage} />
-      <Tab.Screen name="OAuth" component={OAuthPage} />
-    </Tab.Navigator>
-  );
+const STACK_SCREEN_OPTIONS = {
+	headerShown: false,
+	cardStyle: { backgroundColor: "#FFFFFF" },
+	animationEnabled: true,
+} as const;
+
+const TAB_SCREEN_OPTIONS = {
+	headerShown: false,
+	tabBarStyle: {
+		paddingBottom: 5,
+		paddingTop: 5,
+		height: 60,
+		elevation: 8,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: -2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 8,
+	},
+	tabBarLabelStyle: {
+		fontSize: 12,
+		fontWeight: "500" as const,
+	},
+} as const;
+
+// Optimized tab icon component
+const TabIcon: React.FC<TabIconProps & { iconName: TabIconName }> = React.memo(({ iconName, size, color }) => (
+	<IconButton
+		icon={iconName}
+		size={size}
+		iconColor={color}
+		style={{ margin: 0 }}
+	/>
+));
+
+// Tab Navigator Component
+const MainTabNavigator: React.FC = () => {
+	const tabScreenOptions = useCallback(
+		({ route }: RouteParams) => ({
+			...TAB_SCREEN_OPTIONS,
+			tabBarIcon: ({ focused, color, size }: TabIconProps) => {
+				const iconName = ICON_MAP[route.name] || ICON_MAP.home;
+				return (
+					<TabIcon
+						iconName={iconName}
+						focused={focused}
+						color={color}
+						size={size}
+					/>
+				);
+			},
+			tabBarActiveTintColor: TAB_CONFIG.activeTintColor,
+			tabBarInactiveTintColor: TAB_CONFIG.inactiveTintColor,
+		}),
+		[],
+	);
+
+	return (
+		<Tab.Navigator
+			screenOptions={tabScreenOptions}
+			initialRouteName="home">
+			<Tab.Screen
+				name="home"
+				component={HomePage}
+				options={{
+					tabBarLabel: "Home",
+				}}
+			/>
+			<Tab.Screen
+				name="profile"
+				component={ProfilePage}
+				options={{ tabBarLabel: "Profile" }}
+			/>
+			<Tab.Screen
+				name="analytics"
+				component={AnalyticsPage}
+				options={{ tabBarLabel: "Analytics" }}
+			/>
+			<Tab.Screen
+				name="business"
+				component={BusinessPage}
+				options={{ tabBarLabel: "Business" }}
+			/>
+			<Tab.Screen
+				name="subscription"
+				component={SubscriptionPage}
+				options={{ tabBarLabel: "Premium" }}
+			/>
+			<Tab.Screen
+				name="oauth"
+				component={OAuthPage}
+				options={{ tabBarLabel: "Connect" }}
+			/>
+		</Tab.Navigator>
+	);
 };
 
-const AppNavigator = () => {
-  const [isAuthenticated, setIsAuthenticated] = React.useState(AuthService.isAuthenticated);
+// Main Stack Navigator for authenticated users
+const AuthenticatedStack: React.FC = () => {
+	return (
+		<Stack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
+			<Stack.Screen
+				name="main"
+				component={MainTabNavigator}
+				options={{
+					gestureEnabled: false, // Prevent swiping back to login
+				}}
+			/>
+			<Stack.Screen
+				name="search"
+				component={SearchPage}
+				options={{
+					title: "Search",
+					headerShown: false,
+					headerStyle: {
+						backgroundColor: TAB_CONFIG.activeTintColor,
+					},
+					headerTintColor: "#FFFFFF",
+					headerTitleStyle: {
+						fontWeight: "600",
+					},
+					presentation: "modal", // Optional: makes it feel like an overlay
+					animationTypeForReplace: "push",
+				}}
+			/>
+		</Stack.Navigator>
+	);
+};
 
-  React.useEffect(() => {
-    // Listen for auth state changes
-    const checkAuth = () => setIsAuthenticated(AuthService.isAuthenticated);
-    checkAuth();
-  }, []);
+// Authentication Stack Navigator
+const AuthStack: React.FC = () => {
+	return (
+		<Stack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
+			<Stack.Screen
+				name="login"
+				component={LoginPage}
+				options={{
+					title: "Sign In",
+				}}
+			/>
+			<Stack.Screen
+				name="signup"
+				component={SignupPage}
+				options={{
+					title: "Create Account",
+					presentation: "modal",
+				}}
+			/>
+		</Stack.Navigator>
+	);
+};
 
-  return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!isAuthenticated ? (
-          <>
-            <Stack.Screen name="Login" component={LoginPage} />
-            <Stack.Screen name="Signup" component={SignupPage} />
-          </>
-        ) : (
-          <Stack.Screen name="Main" component={MainTabNavigator} />
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
+// Main App Navigator
+const AppNavigator: React.FC = () => {
+	const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+	const [isLoading, setIsLoading] = useState<boolean>(true);
+
+	const checkAuthenticationStatus = useCallback(async () => {
+		try {
+			setIsLoading(true);
+			const authStatus = await AuthService.checkAuthStatus();
+			setIsAuthenticated(authStatus);
+		} catch (error) {
+			console.error("Authentication check failed:", error);
+			setIsAuthenticated(false);
+		} finally {
+			setIsLoading(false);
+		}
+	}, []);
+
+	useEffect(() => {
+		checkAuthenticationStatus();
+
+		// Set up auth state listener if AuthService supports it
+		const unsubscribe = AuthService.onAuthStateChanged?.(setIsAuthenticated);
+
+		return () => {
+			unsubscribe?.();
+		};
+	}, [checkAuthenticationStatus]);
+
+	// Memoize navigation structure to prevent unnecessary re-renders
+	const NavigationStructure = useMemo(() => {
+		if (isLoading) {
+			return null; // Or return a loading component
+		}
+
+		return isAuthenticated ? <AuthenticatedStack /> : <AuthStack />;
+	}, [isAuthenticated, isLoading]);
+
+	return <NavigationContainer>{NavigationStructure}</NavigationContainer>;
 };
 
 export default AppNavigator;

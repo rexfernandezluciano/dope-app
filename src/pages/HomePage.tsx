@@ -1,6 +1,6 @@
 /** @format */
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { View, Text, FlatList, RefreshControl, Alert, Dimensions, ScrollView } from "react-native";
 import { FAB, IconButton, Modal, Portal, Chip, Surface, Button, Divider, ActivityIndicator } from "react-native-paper";
 import { TabView, SceneMap, TabBar } from "react-native-tab-view";
@@ -71,7 +71,7 @@ const HomePage: React.FC = () => {
 	}, []);
 
 	// Optimized filter building function
-	const buildPostFilters = useCallback((currentFilters: FilterState): PostFilters => {
+	const buildPostFilters = (currentFilters: FilterState): PostFilters => {
 		const postFilters: PostFilters = {
 			limit: 20,
 			sortBy: currentFilters.sortBy,
@@ -92,11 +92,10 @@ const HomePage: React.FC = () => {
 		}
 
 		return postFilters;
-	}, []);
+	};
 
 	// Enhanced post fetching with proper error handling and retry logic
-	const fetchPosts = useCallback(
-		async (feedType: "feed" | "following", refresh = false, retryCount = 0): Promise<void> => {
+	const fetchPosts = async (feedType: "feed" | "following", refresh = false, retryCount = 0): Promise<void> => {
 			try {
 				if (refresh) {
 					setRefreshing(true);
@@ -147,9 +146,7 @@ const HomePage: React.FC = () => {
 				setLoading(false);
 				setRefreshing(false);
 			}
-		},
-		[filters, isAuthenticated, buildPostFilters],
-	);
+		};
 
 	// Load initial data based on authentication status
 	useEffect(() => {
@@ -173,8 +170,7 @@ const HomePage: React.FC = () => {
 	}, [routes, tabIndex, fetchPosts]);
 
 	// Handle tab change with data loading
-	const handleIndexChange = useCallback(
-		(index: number) => {
+	const handleIndexChange = (index: number) => {
 			setTabIndex(index);
 			const feedType = routes[index].key as "feed" | "following";
 
@@ -187,24 +183,22 @@ const HomePage: React.FC = () => {
 			if (posts.length === 0) {
 				fetchPosts(feedType);
 			}
-		},
-		[routes, isAuthenticated, feedPosts, followingPosts, fetchPosts],
-	);
+		};
 
 	// Pull-to-refresh functionality
-	const onRefresh = useCallback(() => {
+	const onRefresh = () => {
 		const currentFeedType = routes[tabIndex].key as "feed" | "following";
 		fetchPosts(currentFeedType, true);
-	}, [tabIndex, routes, fetchPosts]);
+	};
 
 	// Filter application with validation
-	const applyFilters = useCallback(() => {
+	const applyFilters = () => {
 		setFilterModalVisible(false);
 		debouncedFilterApplication(tempFilters);
-	}, [tempFilters, debouncedFilterApplication]);
+	};
 
 	// Reset filters to default state
-	const resetFilters = useCallback(() => {
+	const resetFilters = () => {
 		const defaultFilters: FilterState = {
 			postType: "all",
 			sortBy: "asc",
@@ -214,10 +208,10 @@ const HomePage: React.FC = () => {
 			random: true,
 		};
 		setTempFilters(defaultFilters);
-	}, []);
+	};
 
 	// Post creation navigation
-	const handleCreatePost = useCallback(() => {
+	const handleCreatePost = () => {
 		if (!isAuthenticated) {
 			Alert.alert("Authentication Required", "Please log in to create and share posts with the community.", [
 				{
@@ -230,11 +224,10 @@ const HomePage: React.FC = () => {
 		}
 
 		navigation.navigate("createPost" as never);
-	}, [isAuthenticated, navigation]);
+	};
 
 	// Optimized post renderer with error boundary
-	const renderPost = useCallback(
-		({ item }: { item: Post }) => {
+	const renderPost = ({ item }: { item: Post }) => {
 			try {
 				return (
 					<PostView
@@ -248,13 +241,10 @@ const HomePage: React.FC = () => {
 				console.error("Error rendering post:", error);
 				return null;
 			}
-		},
-		[navigation],
-	);
+		};
 
 	// Enhanced empty state component with contextual messaging
-	const renderEmptyState = useCallback(
-		(feedType: "feed" | "following") => (
+	const renderEmptyState = (feedType: "feed" | "following") => (
 			<View style={styles.emptyState}>
 				<Text style={styles.emptyStateTitle}>{feedType === "following" ? "No posts from people you follow" : "No posts found"}</Text>
 				<Text style={styles.emptyStateSubtitle}>
@@ -271,9 +261,7 @@ const HomePage: React.FC = () => {
 					</Button>
 				)}
 			</View>
-		),
-		[],
-	);
+		);
 
 	// Optimized FlatList configuration
 	const flatListConfig = useMemo(
@@ -289,8 +277,7 @@ const HomePage: React.FC = () => {
 	);
 
 	// Feed tab scene component
-	const FeedRoute = useCallback(
-		() => (
+	const FeedRoute = () => (
 			<FlatList
 				data={feedPosts}
 				renderItem={renderPost}
@@ -308,12 +295,10 @@ const HomePage: React.FC = () => {
 				contentContainerStyle={feedPosts.length === 0 ? styles.emptyContainer : styles.postList}
 				{...flatListConfig}
 			/>
-		),
-		[feedPosts, renderPost, renderEmptyState, refreshing, onRefresh, flatListConfig],
-	);
+		);
 
 	// Following tab scene component
-	const FollowingRoute = useCallback(() => {
+	const FollowingRoute = () => {
 		if (!isAuthenticated) {
 			return (
 				<View style={styles.emptyState}>
@@ -348,7 +333,7 @@ const HomePage: React.FC = () => {
 				{...flatListConfig}
 			/>
 		);
-	}, [followingPosts, isAuthenticated, renderPost, renderEmptyState, refreshing, onRefresh, flatListConfig, navigation]);
+	};
 
 	// Scene mapping for tab view
 	const renderScene = useMemo(
@@ -361,8 +346,7 @@ const HomePage: React.FC = () => {
 	);
 
 	// Custom tab bar component
-	const renderTabBar = useCallback(
-		(props: any) => (
+	const renderTabBar = (props: any) => (
 			<TabBar
 				{...props}
 				indicatorStyle={styles.tabIndicator}
@@ -372,9 +356,7 @@ const HomePage: React.FC = () => {
 				inactiveColor="#666666"
 				pressColor="rgba(0, 105, 181, 0.12)"
 			/>
-		),
-		[],
-	);
+		);
 
 	// Enhanced filter modal content with better UX
 	const renderFilterModal = () => (

@@ -1,7 +1,7 @@
 /** @format */
 
 import DOPEClient, { RequestMethod, DOPEClientError, ApiResponse } from "../api/config/DOPEClient";
-import { saveSecure, getSecure, removeSecure } from "../utils/storage.utils";
+import { saveSecure, getSecure, removeSecure } from "../utils/storage-utils";
 
 // Enhanced types with better structure
 export interface User {

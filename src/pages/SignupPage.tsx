@@ -1,6 +1,6 @@
 /** @format */
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { View, Text, Alert, ScrollView, Platform } from "react-native";
 import { TextInput, Button, RadioButton, Avatar, ActivityIndicator, HelperText, Menu, Divider } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
@@ -62,27 +62,27 @@ const SignupPage = () => {
 	}, [formData.birthday]);
 
 	// Form update helper
-	const updateFormData = useCallback((field, value) => {
+	const updateFormData = (field, value) => {
 		setFormData(prev => ({ ...prev, [field]: value }));
 		setError(""); // Clear error when user makes changes
-	}, []);
+	};
 
 	// Validation functions
-	const validateEmail = useCallback(email => {
+	const validateEmail = email => {
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		return emailRegex.test(email);
-	}, []);
+	};
 
-	const validateUsername = useCallback(username => {
+	const validateUsername = username => {
 		return username.length >= MIN_USERNAME_LENGTH && USERNAME_REGEX.test(username);
-	}, []);
+	};
 
-	const validatePassword = useCallback(password => {
+	const validatePassword = password => {
 		return password.length >= MIN_PASSWORD_LENGTH;
-	}, []);
+	};
 
 	// API calls
-	const checkAvailability = useCallback(async (field, value) => {
+	const checkAvailability = async (field, value) => {
 		if (!value) return { exists: false };
 
 		try {
@@ -91,33 +91,33 @@ const SignupPage = () => {
 		} catch (error) {
 			throw new Error(`Failed to check ${field} availability`);
 		}
-	}, []);
+	};
 
 	// Navigation helpers
-	const nextStep = useCallback(() => {
+	const nextStep = () => {
 		if (step < STEPS.length - 1) {
 			setStep(prev => prev + 1);
 			setError("");
 		}
-	}, [step]);
+	};
 
-	const prevStep = useCallback(() => {
+	const prevStep = () => {
 		if (step > 0) {
 			setStep(prev => prev - 1);
 			setError("");
 		}
-	}, [step]);
+	};
 
 	// Step handlers
-	const handleNameStep = useCallback(() => {
+	const handleNameStep = () => {
 		if (!formData.firstName.trim() || !formData.lastName.trim()) {
 			setError("Please enter your full name.");
 			return;
 		}
 		nextStep();
-	}, [formData.firstName, formData.lastName, nextStep]);
+	};
 
-	const handleEmailStep = useCallback(async () => {
+	const handleEmailStep = async () => {
 		if (!formData.email.trim()) {
 			setError("Please enter your email address.");
 			return;
@@ -143,9 +143,9 @@ const SignupPage = () => {
 		} finally {
 			setLoading(false);
 		}
-	}, [formData.email, validateEmail, checkAvailability, nextStep]);
+	};
 
-	const handleUsernameStep = useCallback(async () => {
+	const handleUsernameStep = async () => {
 		if (!validateUsername(formData.username)) {
 			setError(`Username must be at least ${MIN_USERNAME_LENGTH} characters and contain only letters, numbers, and underscores.`);
 			return;
@@ -166,17 +166,17 @@ const SignupPage = () => {
 		} finally {
 			setLoading(false);
 		}
-	}, [formData.username, validateUsername, checkAvailability, nextStep]);
+	};
 
-	const handlePasswordStep = useCallback(() => {
+	const handlePasswordStep = () => {
 		if (!validatePassword(formData.password)) {
 			setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
 			return;
 		}
 		nextStep();
-	}, [formData.password, validatePassword, nextStep]);
+	};
 
-	const handlePersonalInfoStep = useCallback(() => {
+	const handlePersonalInfoStep = () => {
 		if (!formData.gender) {
 			setError("Please select your gender.");
 			return;
@@ -188,24 +188,21 @@ const SignupPage = () => {
 		}
 
 		nextStep();
-	}, [formData.gender, isValidAge, nextStep]);
+	};
 
 	// Date picker handlers
-	const onChangeBirthday = useCallback(
-		(event, selectedDate) => {
-			const currentDate = selectedDate || formData.birthday;
-			setShowDatePicker(Platform.OS === "ios");
-			updateFormData("birthday", currentDate);
-		},
-		[formData.birthday, updateFormData],
-	);
+	const onChangeBirthday = (event, selectedDate) => {
+		const currentDate = selectedDate || formData.birthday;
+		setShowDatePicker(Platform.OS === "ios");
+		updateFormData("birthday", currentDate);
+	};
 
-	const showDatepicker = useCallback(() => {
+	const showDatepicker = () => {
 		setShowDatePicker(true);
-	}, []);
+	};
 
 	// Final signup
-	const handleSignup = useCallback(async () => {
+	const handleSignup = async () => {
 		if (!formData.firstName || !formData.lastName || !formData.email || !formData.username || !formData.password) {
 			Alert.alert("Error", "Please fill in all required fields");
 			return;
@@ -234,7 +231,7 @@ const SignupPage = () => {
 		} finally {
 			setLoading(false);
 		}
-	}, [formData]);
+	};
 
 	// Render gender selection
 	const renderGenderSelection = () => (

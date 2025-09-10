@@ -1,6 +1,6 @@
 /** @format */
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { NavigationContainer } from "@react-navigation/native";
@@ -210,7 +210,7 @@ const AppNavigator: React.FC = () => {
 	const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
 
-	const checkAuthenticationStatus = useCallback(async () => {
+	const checkAuthenticationStatus = async () => {
 		try {
 			setIsLoading(true);
 			const authStatus = await AuthService.checkAuthStatus();
@@ -221,7 +221,7 @@ const AppNavigator: React.FC = () => {
 		} finally {
 			setIsLoading(false);
 		}
-	}, []);
+	};
 
 	useEffect(() => {
 		checkAuthenticationStatus();

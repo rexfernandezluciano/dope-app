@@ -1,13 +1,13 @@
 /** @format */
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { View, Text, TouchableOpacity, Image, ScrollView, Alert, StyleSheet } from "react-native";
 import { Avatar, IconButton, Chip, Card, Icon, Menu } from "react-native-paper";
 
 import PostService from "../services/PostService";
 import AuthService from "../services/AuthService";
 import { Post } from "../api/interface/post.interface";
-import { formatDate, formatCount } from "../utils/format.utils";
+import { formatDate, formatCount } from "../utils/format-utils";
 import { LinkPreview } from "../components/LinkPreview";
 import { ParsedText } from "./TextParser";
 
@@ -48,19 +48,19 @@ const PostView: React.FC<PostViewProps> = ({ post, onComment, onRepostWithCommen
 		setLikeCount(post.stats.likes);
 	}, [initialIsLiked, post.stats.likes]);
 
-	const showAuthAlert = useCallback(() => {
+	const showAuthAlert = () => {
 		Alert.alert("Authentication Required", "Please log in to continue");
-	}, []);
+	};
 
-	const showErrorAlert = useCallback((message: string = "An unexpected error occurred") => {
+	const showErrorAlert = (message: string = "An unexpected error occurred") => {
 		Alert.alert("Error", message);
-	}, []);
+	};
 
-	const showSuccessAlert = useCallback((message: string) => {
+	const showSuccessAlert = (message: string) => {
 		Alert.alert("Success", message);
-	}, []);
+	};
 
-	const handleLike = useCallback(async () => {
+	const handleLike = async () => {
 		if (!AuthService.isAuthenticated) {
 			showAuthAlert();
 			return;
@@ -92,17 +92,17 @@ const PostView: React.FC<PostViewProps> = ({ post, onComment, onRepostWithCommen
 		} finally {
 			setLoading(false);
 		}
-	}, [isLiked, likeCount, loading, showAuthAlert, showErrorAlert, post.id]);
+	};
 
-	const handleComment = useCallback(() => {
+	const handleComment = () => {
 		if (onComment) {
 			onComment(post.id);
 		} else {
 			console.log("Comment on post:", post.id);
 		}
-	}, [onComment, post.id]);
+	};
 
-	const handleShare = useCallback(async () => {
+	const handleShare = async () => {
 		if (shareLoading) return;
 
 		setShareLoading(true);
@@ -118,9 +118,9 @@ const PostView: React.FC<PostViewProps> = ({ post, onComment, onRepostWithCommen
 		} finally {
 			setShareLoading(false);
 		}
-	}, [shareLoading, showErrorAlert, showSuccessAlert, post.id]);
+	};
 
-	const handleRepost = useCallback(async () => {
+	const handleRepost = async () => {
 		if (!AuthService.isAuthenticated) {
 			showAuthAlert();
 			return;
@@ -159,10 +159,9 @@ const PostView: React.FC<PostViewProps> = ({ post, onComment, onRepostWithCommen
 				},
 			},
 		]);
-	}, [showAuthAlert, showErrorAlert, showSuccessAlert, onRepostWithComment, repostLoading, post.id]);
+	};
 
-	const handleVote = useCallback(
-		async (optionId: string) => {
+	const handleVote = async (optionId: string) => {
 			if (!AuthService.isAuthenticated) {
 				showAuthAlert();
 				return;
@@ -180,29 +179,27 @@ const PostView: React.FC<PostViewProps> = ({ post, onComment, onRepostWithCommen
 			} catch (error) {
 				showErrorAlert();
 			}
-		},
-		[showAuthAlert, showErrorAlert, showSuccessAlert, post.poll],
-	);
+		};
 
-	const handleAuthorPress = useCallback(() => {
+	const handleAuthorPress = () => {
 		if (onNavigateToProfile) {
 			onNavigateToProfile(post.author.uid);
 		}
-	}, [onNavigateToProfile, post.author.uid]);
+	};
 
-	const handleMenuPress = useCallback(() => {
+	const handleMenuPress = () => {
 		Alert.alert("Post Options", "What would you like to do?", [
 			{ text: "Cancel", style: "cancel" },
 			{ text: "Copy Link", onPress: () => console.log("Copy link") },
 			{ text: "Report Post", style: "destructive", onPress: () => console.log("Report post") },
 		]);
-	}, []);
+	};
 
-	const renderLinkPreview = useCallback(() => {
+	const renderLinkPreview = () => {
 		return <LinkPreview text={post.isRepost ? post.originalPost.content : post.content} />;
-	}, []);
+	};
 
-	const renderPoll = useCallback(() => {
+	const renderPoll = () => {
 		if (!post.poll) return null;
 
 		return (
@@ -230,9 +227,9 @@ const PostView: React.FC<PostViewProps> = ({ post, onComment, onRepostWithCommen
 				</View>
 			</View>
 		);
-	}, [post.poll, handleVote]);
+	};
 
-	const renderImages = useCallback(() => {
+	const renderImages = () => {
 		if (!post.imageUrls?.length) return null;
 
 		return (
@@ -252,9 +249,9 @@ const PostView: React.FC<PostViewProps> = ({ post, onComment, onRepostWithCommen
 				))}
 			</ScrollView>
 		);
-	}, [post.imageUrls, post.id]);
+	};
 
-	const renderOriginalPost = useCallback(() => {
+	const renderOriginalPost = () => {
 		if (!post.isRepost || !post.originalPost) return null;
 
 		return (
@@ -303,9 +300,9 @@ const PostView: React.FC<PostViewProps> = ({ post, onComment, onRepostWithCommen
 				</Card.Content>
 			</Card>
 		);
-	}, [post.isRepost, post.originalPost]);
+	};
 
-	const renderLiveVideo = useCallback(() => {
+	const renderLiveVideo = () => {
 		if (post.postType !== "live_video" || !post.liveVideoUrl) return null;
 
 		return (
@@ -321,7 +318,7 @@ const PostView: React.FC<PostViewProps> = ({ post, onComment, onRepostWithCommen
 				<Text style={styles.liveVideoUrl}>{post.liveVideoUrl}</Text>
 			</View>
 		);
-	}, [post.postType, post.liveVideoUrl]);
+	};
 
 	return (
 		<Card

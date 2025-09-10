@@ -1,21 +1,14 @@
 {
-  "compilerOptions": {
-    "esModuleInterop": true,
-    "lib": [
-      "es2022"
-    ],
-    "newLine": "lf",
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "outDir": "dist/",
-    "strict": true,
-    "target": "es5"
-  },
-  "include": [
-    "typings/**/*.d.ts",
-    "node_modules/@*/types-*/*.d.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx"
-  ],
-  "extends": "expo/tsconfig.base"
+	"compilerOptions": {
+		"esModuleInterop": true,
+		"lib": ["es2022"],
+		"newLine": "lf",
+		"module": "commonjs",
+		"moduleResolution": "node",
+		"outDir": "dist/",
+		"strict": true,
+		"target": "es5"
+	},
+	"include": ["typings/**/*.d.ts", "node_modules/@*/types-*/*.d.ts", "src/**/*.ts", "src/**/*.tsx"],
+	"extends": "expo/tsconfig.base"
 }

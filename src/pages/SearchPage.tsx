@@ -1,6 +1,6 @@
 /** @format */
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	ScrollView,
 	View,
@@ -84,7 +84,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 	}, []);
 
 	// Handle search input changes with debouncing
-	const handleSearchInputChange = useCallback((text: string) => {
+	const handleSearchInputChange = (text: string) => {
 		setSearchQuery(text);
 
 		// Clear previous timeout
@@ -100,7 +100,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 		} else {
 			setSuggestions([]);
 		}
-	}, []);
+	};
 
 	// Load search suggestions
 	const loadSearchSuggestions = async (query: string) => {

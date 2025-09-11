@@ -69,11 +69,10 @@ const TAB_SCREEN_OPTIONS = {
                 paddingBottom: 5,
                 paddingTop: 5,
                 height: 60,
-                elevation: 8,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: -2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 8,
+                backgroundColor: "transparent",
+                borderTopWidth: 0,
+                elevation: 0,
+                shadowOpacity: 0,
         },
         tabBarLabelStyle: {
                 fontSize: 12,
@@ -164,28 +163,28 @@ const AnimatedTabNavigator: React.FC = React.memo(() => {
                                 name="home"
                                 component={HomePage}
                                 options={{
-                                        tabBarLabel: "Home",
+                                        tabBarLabel: () => null,
                                 }}
                         />
                         <Tab.Screen
                                 name="notifications"
                                 component={NotificationPage}
-                                options={{ tabBarLabel: "Notifications" }}
+                                options={{ tabBarLabel: () => null }}
                         />
                         <Tab.Screen
                                 name="chat"
                                 component={ChatPage}
-                                options={{ tabBarLabel: "Messages" }}
+                                options={{ tabBarLabel: () => null }}
                         />
                         <Tab.Screen
                                 name="analytics"
                                 component={AnalyticsPage}
-                                options={{ tabBarLabel: "Analytics" }}
+                                options={{ tabBarLabel: () => null }}
                         />
                         <Tab.Screen
                                 name="profile"
                                 component={ProfilePage}
-                                options={{ tabBarLabel: "" }}
+                                options={{ tabBarLabel: () => null }}
                         />
                 </Tab.Navigator>
         );

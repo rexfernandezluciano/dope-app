@@ -26,7 +26,7 @@ build_android:
     - export ANDROID_HOME=$PWD
     - export ANDROID_SDK_ROOT=$PWD
     - export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-    - yes | sdkmanager --licenses
+    - yes | sdkmanager --licenses || true
     - sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
     - cd ..
     # Install Node dependencies

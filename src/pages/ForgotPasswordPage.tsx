@@ -4,9 +4,8 @@ import React, { useState, useRef } from "react";
 import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StatusBar, Dimensions } from "react-native";
 import { TextInput, Button, HelperText, IconButton } from "react-native-paper";
 import * as Animatable from "react-native-animatable";
-import { DOPEClient } from "../services/DOPEClient";
-import { validateEmail } from "../utils/validation";
-import { AlertService } from "../services/AlertService";
+import DOPEClient from "../api/config/DOPEClient";
+import { Alert } from "react-native";
 
 // Get screen dimensions
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -43,6 +42,14 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ navigation, rou
         };
 
         // Validate email
+        const validateEmail = (email: string): string | null => {
+                if (!email) return "Email is required";
+                if (!email.includes("@")) return "Please enter a valid email address";
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) return "Please enter a valid email address";
+                return null;
+        };
+
         const validateForm = () => {
                 const emailError = validateEmail(email);
                 if (emailError) {
@@ -67,17 +74,19 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ navigation, rou
 
                         if (response.success && response.data) {
                                 setEmailSent(true);
-                                AlertService.showSuccess(
-                                        response.data.message || "Password reset instructions have been sent to your email."
+                                Alert.alert(
+                                        "Email Sent",
+                                        response.data.message || "Password reset instructions have been sent to your email.",
+                                        [{ text: "OK" }]
                                 );
                         } else {
-                                throw new Error(response.error || "Failed to send reset email");
+                                throw new Error("Failed to send reset email");
                         }
                 } catch (error: any) {
                         console.error("Forgot password error:", error);
                         const errorMessage = error.message || "Failed to send reset email. Please try again.";
                         setError(errorMessage);
-                        AlertService.showError(errorMessage);
+                        Alert.alert("Error", errorMessage, [{ text: "OK" }]);
                 } finally {
                         setLoading(false);
                 }

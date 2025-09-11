@@ -59,9 +59,7 @@ const PostView: React.FC<PostViewProps> = React.memo(
                                                 }
                                                 abortControllerRef.current = new AbortController();
 
-                                                await PostService.trackPostView(post.id, {
-                                                        signal: abortControllerRef.current.signal,
-                                                });
+                                                await PostService.trackPostView(post.id);
                                         } catch (error: any) {
                                                 if (error.name !== "AbortError") {
                                                         console.warn("Failed to track post view:", error);
@@ -212,7 +210,12 @@ const PostView: React.FC<PostViewProps> = React.memo(
                                         return;
                                 }
 
-                                if (post.poll?.hasUserVoted || post.poll?.isExpired) return;
+                                if (post.poll?.hasUserVoted) return;
+                                
+                                // Check if poll is expired
+                                const now = new Date();
+                                const expiresAt = new Date(post.poll?.expiresAt || '');
+                                if (expiresAt < now) return;
 
                                 try {
                                         const result = await PostService.voteOnPoll(post.poll!.id, [optionId]);
@@ -462,22 +465,15 @@ const PostView: React.FC<PostViewProps> = React.memo(
                                 <View style={styles.postStats}>
                                         <View style={styles.reactions}>
                                                 {(post.likes || []).slice(0, 3).map(l => {
-                                                        return l.user?.photoURL ? (
-                                                                <Avatar.Image
-                                                                        key={l.user.uid}
-                                                                        source={{ uri: l.user.photoURL }}
-                                                                        size={16}
-                                                                        style={styles.reactionAvatar}
-                                                                />
-                                                        ) : (
+                                                        return l.user ? (
                                                                 <Avatar.Text
-                                                                        key={l.user?.uid || Math.random()}
-                                                                        label={l.user?.username?.[0] || "?"}
+                                                                        key={l.user.uid || Math.random()}
+                                                                        label={l.user.username?.[0] || "?"}
                                                                         size={16}
                                                                         color="#eeeeee"
                                                                         style={styles.reactionAvatar}
                                                                 />
-                                                        );
+                                                        ) : null;
                                                 })}
                                                 {(post.likes?.length || 0) > 3 && <Text style={styles.reactionCount}>+{formatCount((post.likes?.length || 0) - 3)}</Text>}
                                         </View>
@@ -508,12 +504,13 @@ const PostView: React.FC<PostViewProps> = React.memo(
                                                 <View style={styles.headerRow}>
                                                         <Text style={styles.authorName}>{post.author?.name}</Text>
                                                         {post.author?.hasBlueCheck && (
-                                                                <Icon
-                                                                        source="check-decagram"
-                                                                        size={16}
-                                                                        color="#1DA1F2"
-                                                                        style={{ marginRight: 4 }}
-                                                                />
+                                                                <View style={{ marginRight: 4 }}>
+                                                                        <Icon
+                                                                                source="check-decagram"
+                                                                                size={16}
+                                                                                color="#1DA1F2"
+                                                                        />
+                                                                </View>
                                                         )}
                                                         <Text style={styles.dot}>·</Text>
                                                         <Text style={styles.postDate}>{formatDate(post.createdAt)}</Text>

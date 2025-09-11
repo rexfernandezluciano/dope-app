@@ -237,10 +237,25 @@ const PostView: React.FC<PostViewProps> = React.memo(
                 const openMenu = useCallback(() => setIsMenuVisible(true), []);
                 const closeMenu = useCallback(() => setIsMenuVisible(false), []);
 
-                const handleCopyLink = useCallback(() => {
-                        console.log("Copy link");
-                        closeMenu();
-                }, [closeMenu]);
+                const handleCopyLink = useCallback(async () => {
+                        try {
+                                // Use share functionality for mobile, construct URL for web
+                                const postUrl = `https://dopp.eu.org/post/${post.id}`;
+                                
+                                // Use the PostService share endpoint
+                                const result = await PostService.sharePost(post.id);
+                                if (result.success) {
+                                        showSuccessAlert("Post shared successfully!");
+                                } else {
+                                        showErrorAlert(result.error || "Failed to share post");
+                                }
+                        } catch (error) {
+                                console.error("Failed to share post:", error);
+                                showErrorAlert("Failed to share post");
+                        } finally {
+                                bottomSheetRef.current?.close();
+                        }
+                }, [post.id, post.author?.name, post.content, showSuccessAlert, showErrorAlert]);
 
                 const handleDeletePost = useCallback(() => {
                         Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
@@ -263,9 +278,46 @@ const PostView: React.FC<PostViewProps> = React.memo(
                 }, [post.id, closeMenu, showSuccessAlert, showErrorAlert]);
 
                 const handleReportPost = useCallback(() => {
-                        console.log("Report post");
-                        closeMenu();
-                }, [closeMenu]);
+                        Alert.alert(
+                                "Report Post",
+                                "Why are you reporting this post?",
+                                [
+                                        { text: "Cancel", style: "cancel", onPress: () => bottomSheetRef.current?.close() },
+                                        {
+                                                text: "Spam",
+                                                onPress: () => submitReport("spam", "This post contains spam content"),
+                                        },
+                                        {
+                                                text: "Harassment",
+                                                onPress: () => submitReport("harassment", "This post contains harassment"),
+                                        },
+                                        {
+                                                text: "Inappropriate Content",
+                                                onPress: () => submitReport("inappropriate", "This post contains inappropriate content"),
+                                        },
+                                        {
+                                                text: "Misinformation",
+                                                onPress: () => submitReport("misinformation", "This post contains false information"),
+                                        },
+                                ]
+                        );
+                }, []);
+
+                const submitReport = useCallback(async (reason: string, description: string) => {
+                        try {
+                                const result = await PostService.reportPost(post.id, reason, description);
+                                if (result.success) {
+                                        showSuccessAlert("Report submitted successfully. Thank you for helping keep our community safe.");
+                                } else {
+                                        showErrorAlert(result.error || "Failed to submit report");
+                                }
+                        } catch (error) {
+                                console.error("Failed to report post:", error);
+                                showErrorAlert("Failed to submit report");
+                        } finally {
+                                bottomSheetRef.current?.close();
+                        }
+                }, [post.id, showSuccessAlert, showErrorAlert]);
 
                 // Function to open the bottom sheet menu
                 const handleOpenBottomSheet = () => {

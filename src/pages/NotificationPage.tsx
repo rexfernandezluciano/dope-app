@@ -1,6 +1,6 @@
 /** @format */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
         View,
         Text,
@@ -8,108 +8,154 @@ import {
         TouchableOpacity,
         StyleSheet,
         RefreshControl,
+        Alert,
+        ActivityIndicator,
 } from "react-native";
 import { Avatar, IconButton, Card, Badge } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { NotificationService, Notification } from "../services/NotificationService";
 
-interface Notification {
-        id: string;
-        type: "like" | "comment" | "follow" | "mention" | "repost";
-        user: {
-                id: string;
-                name: string;
-                username: string;
-                avatar: string;
-        };
-        content?: string;
-        postContent?: string;
-        timestamp: string;
-        isRead: boolean;
-}
+// Remove duplicate interface - using imported one from NotificationService
 
 const NotificationPage: React.FC = () => {
         const [notifications, setNotifications] = useState<Notification[]>([]);
         const [refreshing, setRefreshing] = useState(false);
+        const [loading, setLoading] = useState(true);
         const [filter, setFilter] = useState<"all" | "mentions" | "verified">("all");
+        const [nextCursor, setNextCursor] = useState<string | undefined>();
+        const [hasMore, setHasMore] = useState(false);
+
+        const notificationService = NotificationService.getInstance();
+
+        // Load notifications on component mount
+        useEffect(() => {
+                loadNotifications();
+        }, []);
+
+        const loadNotifications = async (cursor?: string) => {
+                try {
+                        const response = await notificationService.getNotifications({
+                                limit: 20,
+                                cursor,
+                                type: filter === "all" ? undefined : filter,
+                        });
+
+                        if (response.success && response.data) {
+                                const newNotifications = response.data.notifications;
+                                setNotifications(cursor ? [...notifications, ...newNotifications] : newNotifications);
+                                setNextCursor(response.data.nextCursor);
+                                setHasMore(response.data.hasMore);
+                        } else {
+                                Alert.alert("Error", response.error || "Failed to load notifications");
+                        }
+                } catch (error) {
+                        console.error("Error loading notifications:", error);
+                        Alert.alert("Error", "Failed to load notifications");
+                } finally {
+                        setLoading(false);
+                        setRefreshing(false);
+                }
+        };
 
         const mockNotifications: Notification[] = [
                 {
                         id: "1",
                         type: "like",
                         user: {
-                                id: "user1",
+                                uid: "user1",
                                 name: "Alice Smith",
                                 username: "alice_smith",
-                                avatar: "https://via.placeholder.com/40",
+                                photoURL: "https://via.placeholder.com/40",
+                                hasBlueCheck: false,
                         },
                         postContent: "Just shared some amazing insights about React Native...",
                         timestamp: "2 hours ago",
                         isRead: false,
+                        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
                 },
                 {
                         id: "2",
                         type: "follow",
                         user: {
-                                id: "user2",
+                                uid: "user2",
                                 name: "Bob Johnson",
                                 username: "bob_dev",
-                                avatar: "https://via.placeholder.com/40",
+                                photoURL: "https://via.placeholder.com/40",
+                                hasBlueCheck: false,
                         },
                         timestamp: "4 hours ago",
                         isRead: true,
+                        createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
                 },
                 {
                         id: "3",
                         type: "comment",
                         user: {
-                                id: "user3",
+                                uid: "user3",
                                 name: "Carol Williams",
                                 username: "carol_tech",
-                                avatar: "https://via.placeholder.com/40",
+                                photoURL: "https://via.placeholder.com/40",
+                                hasBlueCheck: false,
                         },
                         content: "This is really helpful! Thanks for sharing.",
                         postContent: "10 tips for better React development",
                         timestamp: "1 day ago",
                         isRead: true,
+                        createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
                 },
                 {
                         id: "4",
                         type: "mention",
                         user: {
-                                id: "user4",
+                                uid: "user4",
                                 name: "David Brown",
                                 username: "david_code",
-                                avatar: "https://via.placeholder.com/40",
+                                photoURL: "https://via.placeholder.com/40",
+                                hasBlueCheck: false,
                         },
                         content: "Great work on the latest update @user!",
                         timestamp: "2 days ago",
                         isRead: false,
+                        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
                 },
         ];
 
-        React.useEffect(() => {
-                setNotifications(mockNotifications);
-        }, []);
-
         const onRefresh = useCallback(async () => {
                 setRefreshing(true);
-                // Simulate API call
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                setNotifications(mockNotifications);
-                setRefreshing(false);
+                await loadNotifications();
         }, []);
 
-        const markAsRead = useCallback((notificationId: string) => {
-                setNotifications(prev =>
-                        prev.map(notif =>
-                                notif.id === notificationId ? { ...notif, isRead: true } : notif
-                        )
-                );
-        }, []);
+        const markAsRead = useCallback(async (notificationId: string) => {
+                try {
+                        const response = await notificationService.markAsRead(notificationId);
+                        if (response.success) {
+                                setNotifications(prev =>
+                                        prev.map(notif =>
+                                                notif.id === notificationId ? { ...notif, isRead: true } : notif
+                                        )
+                                );
+                        } else {
+                                Alert.alert("Error", response.error || "Failed to mark notification as read");
+                        }
+                } catch (error) {
+                        console.error("Error marking notification as read:", error);
+                        Alert.alert("Error", "Failed to mark notification as read");
+                }
+        }, [notificationService]);
 
-        const markAllAsRead = useCallback(() => {
-                setNotifications(prev => prev.map(notif => ({ ...notif, isRead: true })));
-        }, []);
+        const markAllAsRead = useCallback(async () => {
+                try {
+                        const response = await notificationService.markAllAsRead();
+                        if (response.success) {
+                                setNotifications(prev => prev.map(notif => ({ ...notif, isRead: true })));
+                        } else {
+                                Alert.alert("Error", response.error || "Failed to mark all notifications as read");
+                        }
+                } catch (error) {
+                        console.error("Error marking all notifications as read:", error);
+                        Alert.alert("Error", "Failed to mark all notifications as read");
+                }
+        }, [notificationService]);
 
         const getNotificationIcon = (type: Notification["type"]) => {
                 switch (type) {
@@ -179,7 +225,7 @@ const NotificationPage: React.FC = () => {
                                 <View style={styles.avatarContainer}>
                                         <Avatar.Image
                                                 size={40}
-                                                source={{ uri: notification.user.avatar }}
+                                                source={{ uri: notification.user.photoURL }}
                                         />
                                         <View style={[
                                                 styles.iconBadge,
@@ -213,6 +259,20 @@ const NotificationPage: React.FC = () => {
                         </View>
                 </TouchableOpacity>
         );
+
+        if (loading && notifications.length === 0) {
+                return (
+                        <SafeAreaView style={styles.container}>
+                                <View style={styles.header}>
+                                        <Text style={styles.headerTitle}>Notifications</Text>
+                                </View>
+                                <View style={styles.loadingContainer}>
+                                        <ActivityIndicator size="large" color="#0069B5" />
+                                        <Text style={styles.loadingText}>Loading notifications...</Text>
+                                </View>
+                        </SafeAreaView>
+                );
+        }
 
         return (
                 <SafeAreaView style={styles.container}>
@@ -424,6 +484,18 @@ const styles = StyleSheet.create({
                 marginTop: 8,
                 textAlign: "center",
                 lineHeight: 20,
+        },
+        loadingContainer: {
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+                paddingVertical: 50,
+        },
+        loadingText: {
+                marginTop: 16,
+                fontSize: 16,
+                color: "#666",
+                textAlign: "center",
         },
 });
 

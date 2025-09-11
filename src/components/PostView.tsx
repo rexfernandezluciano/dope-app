@@ -1,6 +1,6 @@
 /** @format */
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { View, Text, TouchableOpacity, Image, ScrollView, Alert, StyleSheet } from "react-native";
 import { Avatar, IconButton, Chip, Card, Icon, Menu } from "react-native-paper";
 
@@ -8,7 +8,7 @@ import PostService from "../services/PostService";
 import AuthService from "../services/AuthService";
 import { Post } from "../api/interface/post.interface";
 import { formatDate, formatCount } from "../utils/format-utils";
-import { LinkPreview } from "../components/LinkPreview";
+import LinkPreview from "../components/LinkPreview";
 import { ParsedText } from "./TextParser";
 
 interface PostViewProps {
@@ -18,463 +18,506 @@ interface PostViewProps {
 	onNavigateToProfile?: (userId: string) => void;
 }
 
-const PostView: React.FC<PostViewProps> = ({ post, onComment, onRepostWithComment, onNavigateToProfile }) => {
-	// Memoize initial values to prevent unnecessary re-renders
-	const initialIsLiked = useMemo(() => post.likes.some(like => like.user.uid === AuthService.user?.uid), [post.likes]);
+const PostView: React.FC<PostViewProps> = React.memo(
+	({ post, onComment, onRepostWithComment, onNavigateToProfile }) => {
+		// Refs to prevent multiple API calls
+		const viewTrackedRef = useRef(false);
+		const abortControllerRef = useRef<AbortController | null>(null);
+		const lastPostIdRef = useRef(post.id);
 
-	const [isLiked, setIsLiked] = useState(initialIsLiked);
-	const [likeCount, setLikeCount] = useState(post.stats.likes);
-	const [loading, setLoading] = useState(false);
-	const [repostLoading, setRepostLoading] = useState(false);
-	const [shareLoading, setShareLoading] = useState(false);
+		// Memoized values
+		const currentUserId = useMemo(() => AuthService.user?.uid, []);
+		const initialIsLiked = useMemo(() => post.likes?.some(like => like.user?.uid === currentUserId) || false, [post.likes, currentUserId]);
 
-	useEffect(() => {
-		// Track post view when component mounts
-		const trackView = async () => {
-			try {
-				await PostService.trackPostView(post.id);
-			} catch (error) {
-				// Silent fail for analytics
-				console.warn("Failed to track post view:", error);
+		// State
+		const [isLiked, setIsLiked] = useState(initialIsLiked);
+		const [likeCount, setLikeCount] = useState(post.stats?.likes || 0);
+		const [loading, setLoading] = useState(false);
+		const [repostLoading, setRepostLoading] = useState(false);
+		const [shareLoading, setShareLoading] = useState(false);
+
+		// Track view only once per post and only when post changes
+		useEffect(() => {
+			if (lastPostIdRef.current !== post.id) {
+				viewTrackedRef.current = false;
+				lastPostIdRef.current = post.id;
 			}
-		};
 
-		trackView();
-	}, [post.id]);
+			if (!viewTrackedRef.current) {
+				viewTrackedRef.current = true;
 
-	// Update like state if post prop changes
-	useEffect(() => {
-		setIsLiked(initialIsLiked);
-		setLikeCount(post.stats.likes);
-	}, [initialIsLiked, post.stats.likes]);
-
-	const showAuthAlert = () => {
-		Alert.alert("Authentication Required", "Please log in to continue");
-	};
-
-	const showErrorAlert = (message: string = "An unexpected error occurred") => {
-		Alert.alert("Error", message);
-	};
-
-	const showSuccessAlert = (message: string) => {
-		Alert.alert("Success", message);
-	};
-
-	const handleLike = async () => {
-		if (!AuthService.isAuthenticated) {
-			showAuthAlert();
-			return;
-		}
-
-		if (loading) return;
-
-		setLoading(true);
-		const wasLiked = isLiked;
-		const previousCount = likeCount;
-
-		// Optimistic update
-		setIsLiked(!isLiked);
-		setLikeCount(prev => (isLiked ? prev - 1 : prev + 1));
-
-		try {
-			const result = await PostService.likePost(post.id);
-			if (!result.success) {
-				// Revert on failure
-				setIsLiked(wasLiked);
-				setLikeCount(previousCount);
-				showErrorAlert(result.error || "Failed to like post");
-			}
-		} catch (error) {
-			// Revert on error
-			setIsLiked(wasLiked);
-			setLikeCount(previousCount);
-			showErrorAlert();
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	const handleComment = () => {
-		if (onComment) {
-			onComment(post.id);
-		} else {
-			console.log("Comment on post:", post.id);
-		}
-	};
-
-	const handleShare = async () => {
-		if (shareLoading) return;
-
-		setShareLoading(true);
-		try {
-			const result = await PostService.sharePost(post.id);
-			if (result.success) {
-				showSuccessAlert("Post shared successfully!");
-			} else {
-				showErrorAlert(result.error || "Failed to share post");
-			}
-		} catch (error) {
-			showErrorAlert();
-		} finally {
-			setShareLoading(false);
-		}
-	};
-
-	const handleRepost = async () => {
-		if (!AuthService.isAuthenticated) {
-			showAuthAlert();
-			return;
-		}
-
-		Alert.alert("Repost", "Do you want to add a comment to this repost?", [
-			{ text: "Cancel", style: "cancel" },
-			{
-				text: "Repost",
-				onPress: async () => {
-					if (repostLoading) return;
-
-					setRepostLoading(true);
+				const trackView = async () => {
 					try {
-						const result = await PostService.repostPost(post.id);
-						if (result.success) {
-							showSuccessAlert("Post reposted successfully!");
-						} else {
-							showErrorAlert(result.error || "Failed to repost");
+						// Use AbortController to prevent multiple simultaneous calls
+						if (abortControllerRef.current) {
+							abortControllerRef.current.abort();
 						}
-					} catch (error) {
-						showErrorAlert();
-					} finally {
-						setRepostLoading(false);
-					}
-				},
-			},
-			{
-				text: "Add Comment",
-				onPress: () => {
-					if (onRepostWithComment) {
-						onRepostWithComment(post.id);
-					} else {
-						console.log("Repost with comment:", post.id);
-					}
-				},
-			},
-		]);
-	};
+						abortControllerRef.current = new AbortController();
 
-	const handleVote = async (optionId: string) => {
+						await PostService.trackPostView(post.id, {
+							signal: abortControllerRef.current.signal,
+						});
+					} catch (error: any) {
+						if (error.name !== "AbortError") {
+							console.warn("Failed to track post view:", error);
+						}
+					}
+				};
+
+				trackView();
+			}
+
+			return () => {
+				// Cleanup abort controller on unmount
+				if (abortControllerRef.current) {
+					abortControllerRef.current.abort();
+				}
+			};
+		}, [post.id]);
+
+		// Update state only when post data actually changes
+		useEffect(() => {
+			const newIsLiked = post.likes?.some(like => like.user?.uid === currentUserId) || false;
+			if (newIsLiked !== isLiked) {
+				setIsLiked(newIsLiked);
+			}
+			if ((post.stats?.likes || 0) !== likeCount) {
+				setLikeCount(post.stats?.likes || 0);
+			}
+		}, [post.likes, post.stats?.likes, currentUserId, isLiked, likeCount]);
+
+		// Memoized callbacks to prevent re-renders
+		const showAuthAlert = useCallback(() => {
+			Alert.alert("Authentication Required", "Please log in to continue");
+		}, []);
+
+		const showErrorAlert = useCallback((message: string = "An unexpected error occurred") => {
+			Alert.alert("Error", message);
+		}, []);
+
+		const showSuccessAlert = useCallback((message: string) => {
+			Alert.alert("Success", message);
+		}, []);
+
+		const handleLike = useCallback(async () => {
 			if (!AuthService.isAuthenticated) {
 				showAuthAlert();
 				return;
 			}
 
-			if (post.poll?.hasUserVoted || post.poll?.isExpired) return;
+			if (loading) return;
+
+			setLoading(true);
+			const wasLiked = isLiked;
+			const previousCount = likeCount;
+
+			// Optimistic update
+			setIsLiked(!wasLiked);
+			setLikeCount(prev => (wasLiked ? prev - 1 : prev + 1));
 
 			try {
-				const result = await PostService.voteOnPoll(post.poll!.id, [optionId]);
+				const result = await PostService.likePost(post.id);
+				if (!result.success) {
+					// Revert on failure
+					setIsLiked(wasLiked);
+					setLikeCount(previousCount);
+					showErrorAlert(result.error || "Failed to like post");
+				}
+			} catch (error) {
+				// Revert on error
+				setIsLiked(wasLiked);
+				setLikeCount(previousCount);
+				showErrorAlert();
+			} finally {
+				setLoading(false);
+			}
+		}, [loading, isLiked, likeCount, post.id, showAuthAlert, showErrorAlert]);
+
+		const handleComment = useCallback(() => {
+			if (onComment) {
+				onComment(post.id);
+			} else {
+				console.log("Comment on post:", post.id);
+			}
+		}, [onComment, post.id]);
+
+		const handleShare = useCallback(async () => {
+			if (shareLoading) return;
+
+			setShareLoading(true);
+			try {
+				const result = await PostService.sharePost(post.id);
 				if (result.success) {
-					showSuccessAlert("Vote submitted successfully!");
+					showSuccessAlert("Post shared successfully!");
 				} else {
-					showErrorAlert(result.error || "Failed to vote");
+					showErrorAlert(result.error || "Failed to share post");
 				}
 			} catch (error) {
 				showErrorAlert();
+			} finally {
+				setShareLoading(false);
 			}
-		};
+		}, [shareLoading, post.id, showSuccessAlert, showErrorAlert]);
 
-	const handleAuthorPress = () => {
-		if (onNavigateToProfile) {
-			onNavigateToProfile(post.author.uid);
-		}
-	};
+		const handleRepost = useCallback(async () => {
+			if (!AuthService.isAuthenticated) {
+				showAuthAlert();
+				return;
+			}
 
-	const handleMenuPress = () => {
-		Alert.alert("Post Options", "What would you like to do?", [
-			{ text: "Cancel", style: "cancel" },
-			{ text: "Copy Link", onPress: () => console.log("Copy link") },
-			{ text: "Report Post", style: "destructive", onPress: () => console.log("Report post") },
-		]);
-	};
+			Alert.alert("Repost", "Do you want to add a comment to this repost?", [
+				{ text: "Cancel", style: "cancel" },
+				{
+					text: "Repost",
+					onPress: async () => {
+						if (repostLoading) return;
 
-	const renderLinkPreview = () => {
-		return <LinkPreview text={post.isRepost ? post.originalPost.content : post.content} />;
-	};
+						setRepostLoading(true);
+						try {
+							const result = await PostService.repostPost(post.id);
+							if (result.success) {
+								showSuccessAlert("Post reposted successfully!");
+							} else {
+								showErrorAlert(result.error || "Failed to repost");
+							}
+						} catch (error) {
+							showErrorAlert();
+						} finally {
+							setRepostLoading(false);
+						}
+					},
+				},
+				{
+					text: "Add Comment",
+					onPress: () => {
+						if (onRepostWithComment) {
+							onRepostWithComment(post.id);
+						} else {
+							console.log("Repost with comment:", post.id);
+						}
+					},
+				},
+			]);
+		}, [repostLoading, post.id, onRepostWithComment, showAuthAlert, showSuccessAlert, showErrorAlert]);
 
-	const renderPoll = () => {
-		if (!post.poll) return null;
+		const handleVote = useCallback(
+			async (optionId: string) => {
+				if (!AuthService.isAuthenticated) {
+					showAuthAlert();
+					return;
+				}
 
-		return (
-			<View style={styles.pollContainer}>
-				{post.poll.options.map(option => (
-					<TouchableOpacity
-						key={option.id}
-						style={[styles.pollOption, option.isUserChoice && styles.pollOptionSelected]}
-						onPress={() => handleVote(option.id)}
-						disabled={post.poll?.hasUserVoted || post.poll?.isExpired}
-						accessibilityLabel={`Poll option: ${option.text}, ${option.percentage}% with ${option.votes} votes`}>
-						<View style={styles.pollOptionContent}>
-							<Text style={styles.pollOptionText}>{option.text}</Text>
-							<View style={styles.pollStats}>
-								<Text style={styles.pollPercentage}>{option.percentage}%</Text>
-								<Text style={styles.pollVotes}>{option.votes} votes</Text>
+				if (post.poll?.hasUserVoted || post.poll?.isExpired) return;
+
+				try {
+					const result = await PostService.voteOnPoll(post.poll!.id, [optionId]);
+					if (result.success) {
+						showSuccessAlert("Vote submitted successfully!");
+					} else {
+						showErrorAlert(result.error || "Failed to vote");
+					}
+				} catch (error) {
+					showErrorAlert();
+				}
+			},
+			[post.poll, showAuthAlert, showSuccessAlert, showErrorAlert],
+		);
+
+		const handleAuthorPress = useCallback(() => {
+			if (onNavigateToProfile) {
+				onNavigateToProfile(post.author?.uid);
+			}
+		}, [onNavigateToProfile, post.author?.uid]);
+
+		const handleMenuPress = useCallback(() => {
+			Alert.alert("Post Options", "What would you like to do?", [
+				{ text: "Cancel", style: "cancel" },
+				{ text: "Copy Link", onPress: () => console.log("Copy link") },
+				{ text: "Report Post", style: "destructive", onPress: () => console.log("Report post") },
+			]);
+		}, []);
+
+		// Memoized render functions to prevent unnecessary re-renders
+		const renderLinkPreview = useMemo(() => {
+			return <LinkPreview text={post.isRepost ? post.originalPost?.content || "" : post.content || ""} />;
+		}, [post.isRepost, post.originalPost?.content, post?.content]);
+
+		const renderPoll = useMemo(() => {
+			if (!post.poll) return null;
+
+			return (
+				<View style={styles.pollContainer}>
+					{post.poll.options?.map(option => (
+						<TouchableOpacity
+							key={option.id}
+							style={[styles.pollOption, option.isUserChoice && styles.pollOptionSelected]}
+							onPress={() => handleVote(option.id)}
+							disabled={post.poll?.hasUserVoted || post.poll?.isExpired}
+							accessibilityLabel={`Poll option: ${option.text}, ${option.percentage}% with ${option.votes} votes`}>
+							<View style={styles.pollOptionContent}>
+								<Text style={styles.pollOptionText}>{option.text}</Text>
+								<View style={styles.pollStats}>
+									<Text style={styles.pollPercentage}>{option.percentage}%</Text>
+									<Text style={styles.pollVotes}>{option.votes} votes</Text>
+								</View>
 							</View>
-						</View>
-						<View style={[styles.pollBar, { width: `${option.percentage}%` }]} />
-					</TouchableOpacity>
-				))}
-				<View style={styles.pollFooter}>
-					<Text style={styles.pollFooterText}>Total votes: {post.poll.totalVotes}</Text>
-					{post.poll?.isExpired && <Text style={styles.pollFooterText}>Poll ended</Text>}
-				</View>
-			</View>
-		);
-	};
-
-	const renderImages = () => {
-		if (!post.imageUrls?.length) return null;
-
-		return (
-			<ScrollView
-				horizontal
-				style={styles.imageContainer}
-				contentContainerStyle={styles.imageContentContainer}
-				showsHorizontalScrollIndicator={false}>
-				{post.imageUrls.map((url, index) => (
-					<Image
-						key={`${post.id}-image-${index}`}
-						source={{ uri: url }}
-						style={styles.postImage}
-						resizeMode="cover"
-						accessibilityLabel={`Post image ${index + 1} of ${post.imageUrls.length}`}
-					/>
-				))}
-			</ScrollView>
-		);
-	};
-
-	const renderOriginalPost = () => {
-		if (!post.isRepost || !post.originalPost) return null;
-
-		return (
-			<Card
-				style={styles.originalPostCard}
-				mode="outlined">
-				<Card.Content>
-					<View style={styles.originalPostHeader}>
-						<Avatar.Image
-							size={24}
-							source={{ uri: post.originalPost.author.photoURL }}
-						/>
-						<View style={styles.originalPostAuthorContainer}>
-							<Text style={styles.originalPostAuthor}>{post.originalPost.author.name}</Text>
-							{post.originalPost.author.hasBlueCheck && (
-								<Icon
-									source="check-decagram"
-									size={12}
-									color="#0069b5"
-								/>
-							)}
-						</View>
-						<Text style={styles.originalPostUsername}>• {formatDate(post.originalPost.createdAt)}</Text>
+							<View style={[styles.pollBar, { width: `${option.percentage}%` }]} />
+						</TouchableOpacity>
+					)) || []}
+					<View style={styles.pollFooter}>
+						<Text style={styles.pollFooterText}>Total votes: {post.poll.totalVotes}</Text>
+						{post.poll?.isExpired && <Text style={styles.pollFooterText}>Poll ended</Text>}
 					</View>
-
-					{post.originalPost.content && <ParsedText style={styles.originalPostContent}>{post.originalPost.content}</ParsedText>}
-
-					{post.originalPost.imageUrls?.length > 0 && (
-						<ScrollView
-							horizontal
-							style={styles.imageContainer}
-							contentContainerStyle={styles.imageContentContainer}
-							showsHorizontalScrollIndicator={false}>
-							{post.originalPost.imageUrls.map((url: string, index: number) => (
-								<Image
-									key={`${post.originalPost!.id}-image-${index}`}
-									source={{ uri: url }}
-									style={styles.originalPostImage}
-									resizeMode="cover"
-									accessibilityLabel={`Original post image ${index + 1}`}
-								/>
-							))}
-						</ScrollView>
-					)}
-					{renderLinkPreview()}
-				</Card.Content>
-			</Card>
-		);
-	};
-
-	const renderLiveVideo = () => {
-		if (post.postType !== "live_video" || !post.liveVideoUrl) return null;
-
-		return (
-			<View style={styles.liveVideoContainer}>
-				<View style={styles.liveIndicatorContainer}>
-					<Icon
-						source="record-circle"
-						size={16}
-						color="#ff1744"
-					/>
-					<Text style={styles.liveIndicator}>LIVE</Text>
 				</View>
-				<Text style={styles.liveVideoUrl}>{post.liveVideoUrl}</Text>
-			</View>
-		);
-	};
+			);
+		}, [post.poll, handleVote]);
 
-	return (
-		<Card
-			elevation={0}
-			style={styles.postCard}>
-			<Card.Content>
-				{/* Post Header */}
-				<View style={styles.postHeader}>
-					<TouchableOpacity
-						onPress={handleAuthorPress}
-						style={styles.authorSection}>
-						<Avatar.Image
-							size={40}
-							source={{ uri: post.author.photoURL }}
+		const renderImages = useMemo(() => {
+			if (!post.imageUrls?.length) return null;
+
+			return (
+				<ScrollView
+					horizontal
+					style={styles.imageContainer}
+					contentContainerStyle={styles.imageContentContainer}
+					showsHorizontalScrollIndicator={false}>
+					{post.imageUrls.map((url, index) => (
+						<Image
+							key={`${post.id}-image-${index}`}
+							source={{ uri: url }}
+							style={styles.postImage}
+							resizeMode="cover"
+							accessibilityLabel={`Post image ${index + 1} of ${post.imageUrls.length}`}
 						/>
-						<View style={styles.postAuthorInfo}>
-							<View style={styles.authorInfoRow}>
-								<Text style={styles.authorName}>{post.author.name}</Text>
-								{post.author.hasBlueCheck && (
+					))}
+				</ScrollView>
+			);
+		}, [post.imageUrls, post.id]);
+
+		const renderOriginalPost = useMemo(() => {
+			if (!post.isRepost || !post.originalPost) return null;
+
+			return (
+				<Card
+					style={styles.originalPostCard}
+					mode="outlined">
+					<Card.Content>
+						<View style={styles.originalPostHeader}>
+							<Avatar.Image
+								size={24}
+								source={{ uri: post.originalPost.author?.photoURL }}
+							/>
+							<View style={styles.originalPostAuthorContainer}>
+								<Text style={styles.originalPostAuthor}>{post.originalPost.author?.name}</Text>
+								{post.originalPost.author?.hasBlueCheck && (
 									<Icon
 										source="check-decagram"
-										size={16}
+										size={12}
 										color="#0069b5"
 									/>
 								)}
 							</View>
+							<Text style={styles.originalPostUsername}>• {formatDate(post.originalPost.createdAt)}</Text>
+						</View>
+
+						{post.originalPost.content && <ParsedText style={styles.originalPostContent}>{post.originalPost.content}</ParsedText>}
+
+						{post.originalPost.imageUrls?.length && post.originalPost.imageUrls.length > 0 && (
+							<ScrollView
+								horizontal
+								style={styles.imageContainer}
+								contentContainerStyle={styles.imageContentContainer}
+								showsHorizontalScrollIndicator={false}>
+								{post.originalPost.imageUrls.map((url: string, index: number) => (
+									<Image
+										key={`${post.originalPost!.id}-image-${index}`}
+										source={{ uri: url }}
+										style={styles.originalPostImage}
+										resizeMode="cover"
+										accessibilityLabel={`Original post image ${index + 1}`}
+									/>
+								))}
+							</ScrollView>
+						)}
+						{renderLinkPreview}
+					</Card.Content>
+				</Card>
+			);
+		}, [post.isRepost, post.originalPost, renderLinkPreview]);
+
+		const renderLiveVideo = useMemo(() => {
+			if (post.postType !== "live_video" || !post.liveVideoUrl) return null;
+
+			return (
+				<View style={styles.liveVideoContainer}>
+					<View style={styles.liveIndicatorContainer}>
+						<Icon
+							source="record-circle"
+							size={16}
+							color="#ff1744"
+						/>
+						<Text style={styles.liveIndicator}>LIVE</Text>
+					</View>
+					<Text style={styles.liveVideoUrl}>{post.liveVideoUrl}</Text>
+				</View>
+			);
+		}, [post.postType, post.liveVideoUrl]);
+
+		// Memoized stats rendering to prevent recalculation
+		const hasStats = useMemo(
+			() => (post.stats?.views || 0) > 0 || (post.stats?.reposts || 0) > 0 || (post.likes?.length || 0) > 0,
+			[post.stats?.views, post.stats?.reposts, post.likes?.length],
+		);
+
+		const renderPostStats = useMemo(() => {
+			if (!hasStats) return null;
+
+			return (
+				<View style={styles.postStats}>
+					<View style={styles.reactions}>
+						{(post.likes || []).slice(0, 3).map(l => {
+							return l.user?.photoURL ? (
+								<Avatar.Image
+									key={l.user.uid}
+									source={{ uri: l.user.photoURL }}
+									size={16}
+									style={styles.reactionAvatar}
+								/>
+							) : (
+								<Avatar.Text
+									key={l.user?.uid || Math.random()}
+									label={l.user?.username?.[0] || "?"}
+									size={16}
+									color="#eeeeee"
+									style={styles.reactionAvatar}
+								/>
+							);
+						})}
+						{(post.likes?.length || 0) > 3 && <Text style={styles.reactionCount}>+{formatCount((post.likes?.length || 0) - 3)}</Text>}
+					</View>
+					<View style={styles.stats}>
+						{(post.stats?.views || 0) > 0 && <Text style={styles.statText}>{formatCount(post.stats.views)} views</Text>}
+						{(post.stats?.reposts || 0) > 0 && <Text style={styles.statText}>{formatCount(post.stats.reposts)} reposts</Text>}
+					</View>
+				</View>
+			);
+		}, [hasStats, post.likes, post.stats?.views, post.stats?.reposts]);
+
+		return (
+			<Card
+				elevation={0}
+				style={styles.postCard}>
+				<Card.Content style={styles.postContainer}>
+					{/* Left column: Avatar */}
+					<TouchableOpacity onPress={onNavigateToProfile}>
+						<Avatar.Image
+							size={48}
+							source={{ uri: post.author?.photoURL }}
+						/>
+					</TouchableOpacity>
+
+					{/* Right column: Post body */}
+					<View style={styles.postBody}>
+						{/* Header row */}
+						<View style={styles.headerRow}>
+							<Text style={styles.authorName}>{post.author?.name}</Text>
+							{post.author?.hasBlueCheck && (
+								<Icon
+									source="check-decagram"
+									size={16}
+									color="#1DA1F2"
+									style={{ marginRight: 4 }}
+								/>
+							)}
+							<Text style={styles.dot}>·</Text>
 							<Text style={styles.postDate}>{formatDate(post.createdAt)}</Text>
 						</View>
-					</TouchableOpacity>
 
-					<TouchableOpacity
-						style={styles.menuButton}
-						onPress={handleMenuPress}
-						hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-						<Icon
-							source="dots-horizontal"
-							size={20}
-							color="#657786"
-						/>
-					</TouchableOpacity>
-				</View>
+						{/* Post text */}
+						{post.content && <ParsedText style={styles.postContent}>{post.content}</ParsedText>}
 
-				{/* Post Content */}
-				{post.content && (
-					<ParsedText
-						style={styles.postContent}
-						onHashtagClick={() => console.log("Hashtag Cliked")}
-						onMentionClick={() => console.log("Mention Clicked")}
-						onLinkClick={() => console.log("Link Cliked")}
-						textStyle={{ fontSize: 16 }}>
-						{post.content}
-					</ParsedText>
-				)}
+						{/* Media / Link Preview */}
+						{renderImages}
+						{renderLiveVideo}
+						{post.postType === "poll" && renderPoll}
+						{renderOriginalPost}
+						{!post.isRepost && renderLinkPreview}
 
-				{/* Images */}
-				{renderImages()}
+						{/* Stats */}
+						{renderPostStats}
 
-				{/* Live Video */}
-				{renderLiveVideo()}
+						{/* Post Actions */}
+						<View style={styles.postActions}>
+							<TouchableOpacity
+								style={styles.actionButton}
+								onPress={handleComment}
+								accessibilityLabel={`Comment on post. ${post.stats?.comments || 0} comments`}>
+								<Icon
+									source="chat-outline"
+									size={18}
+									color="#657786"
+								/>
+								{(post.stats?.comments || 0) > 0 && <Text style={styles.actionText}>{formatCount(post.stats.comments)}</Text>}
+							</TouchableOpacity>
 
-				{/* Poll */}
-				{post.postType === "poll" && renderPoll()}
+							<TouchableOpacity
+								style={[styles.actionButton, repostLoading && styles.actionButtonDisabled]}
+								onPress={handleRepost}
+								disabled={repostLoading}
+								accessibilityLabel={`Repost. ${post.stats?.reposts || 0} reposts`}>
+								<Icon
+									source="repeat"
+									size={18}
+									color="#657786"
+								/>
+								{(post.stats?.reposts || 0) > 0 && <Text style={styles.actionText}>{formatCount(post.stats.reposts)}</Text>}
+							</TouchableOpacity>
 
-				{/* Original Post (for reposts) */}
-				{renderOriginalPost()}
+							<TouchableOpacity
+								style={[styles.actionButton, loading && styles.actionButtonDisabled]}
+								onPress={handleLike}
+								disabled={loading}
+								accessibilityLabel={`${isLiked ? "Unlike" : "Like"} post. ${likeCount} likes`}>
+								<Icon
+									source={isLiked ? "heart" : "heart-outline"}
+									size={18}
+									color={isLiked ? "#e91e63" : "#657786"}
+								/>
+								{likeCount > 0 && <Text style={[styles.actionText, isLiked && styles.actionTextActive]}>{formatCount(likeCount)}</Text>}
+							</TouchableOpacity>
 
-				{/* Link Preview */}
-				{!post.isRepost && renderLinkPreview()}
-
-				{/* Post Stats */}
-				{(post.stats.views > 0 || post.stats.reposts > 0 || post.likes.length > 0) && (
-					<View style={styles.postStats}>
-						<View style={styles.reactions}>
-							{post.likes.slice(0, 3).map(l => {
-								return l.user.photoURL ? (
-									<Avatar.Image
-										key={l.user.uid}
-										source={{ uri: l.user.photoURL }}
-										size={16}
-										style={styles.reactionAvatar}
-									/>
-								) : (
-									<Avatar.Text
-										key={l.user.uid}
-										label={l.user.username[0]}
-										size={16}
-										color="#eeeeee"
-										style={styles.reactionAvatar}
-									/>
-								);
-							})}
-							{post.likes.length > 3 && <Text style={styles.reactionCount}>+{post.likes.length - 3}</Text>}
-						</View>
-						<View style={styles.stats}>
-							{post.stats.views > 0 && <Text style={styles.statText}>{formatCount(post.stats.views)} views</Text>}
-							{post.stats.reposts > 0 && <Text style={styles.statText}>{formatCount(post.stats.reposts)} reposts</Text>}
+							<TouchableOpacity
+								style={[styles.actionButton, shareLoading && styles.actionButtonDisabled]}
+								onPress={handleShare}
+								disabled={shareLoading}
+								accessibilityLabel="Share post">
+								<Icon
+									source="share-outline"
+									size={18}
+									color="#657786"
+								/>
+							</TouchableOpacity>
 						</View>
 					</View>
-				)}
-
-				{/* Post Actions */}
-				<View style={styles.postActions}>
-					<TouchableOpacity
-						style={styles.actionButton}
-						onPress={handleComment}
-						accessibilityLabel={`Comment on post. ${post.stats.comments} comments`}>
-						<Icon
-							source="chat-outline"
-							size={18}
-							color="#657786"
-						/>
-						{post.stats.comments > 0 && <Text style={styles.actionText}>{formatCount(post.stats.comments)}</Text>}
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={[styles.actionButton, repostLoading && styles.actionButtonDisabled]}
-						onPress={handleRepost}
-						disabled={repostLoading}
-						accessibilityLabel={`Repost. ${post.stats.reposts} reposts`}>
-						<Icon
-							source="repeat"
-							size={18}
-							color="#657786"
-						/>
-						{post.stats.reposts > 0 && <Text style={styles.actionText}>{formatCount(post.stats.reposts)}</Text>}
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={[styles.actionButton, loading && styles.actionButtonDisabled]}
-						onPress={handleLike}
-						disabled={loading}
-						accessibilityLabel={`${isLiked ? "Unlike" : "Like"} post. ${likeCount} likes`}>
-						<Icon
-							source={isLiked ? "heart" : "heart-outline"}
-							size={18}
-							color={isLiked ? "#e91e63" : "#657786"}
-						/>
-						{likeCount > 0 && <Text style={[styles.actionText, isLiked && styles.actionTextActive]}>{formatCount(likeCount)}</Text>}
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={[styles.actionButton, shareLoading && styles.actionButtonDisabled]}
-						onPress={handleShare}
-						disabled={shareLoading}
-						accessibilityLabel="Share post">
-						<Icon
-							source="share-outline"
-							size={18}
-							color="#657786"
-						/>
-					</TouchableOpacity>
-				</View>
-			</Card.Content>
-		</Card>
-	);
-};
+				</Card.Content>
+			</Card>
+		);
+	},
+	(prevProps, nextProps) => {
+		// Custom comparison function for React.memo
+		return (
+			prevProps.post.id === nextProps.post.id &&
+			(prevProps.post.stats?.likes || 0) === (nextProps.post.stats?.likes || 0) &&
+			(prevProps.post.stats?.comments || 0) === (nextProps.post.stats?.comments || 0) &&
+			(prevProps.post.stats?.reposts || 0) === (nextProps.post.stats?.reposts || 0) &&
+			(prevProps.post.stats?.views || 0) === (nextProps.post.stats?.views || 0) &&
+			(prevProps.post.likes?.length || 0) === (nextProps.post.likes?.length || 0) &&
+			prevProps.onComment === nextProps.onComment &&
+			prevProps.onRepostWithComment === nextProps.onRepostWithComment &&
+			prevProps.onNavigateToProfile === nextProps.onNavigateToProfile
+		);
+	},
+);
 
 const styles = StyleSheet.create({
 	postCard: {
@@ -498,7 +541,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	postAuthorInfo: {
-		marginLeft: 12,
 		flex: 1,
 	},
 	authorInfoRow: {
@@ -507,26 +549,10 @@ const styles = StyleSheet.create({
 		gap: 4,
 		marginBottom: 2,
 	},
-	authorName: {
-		fontSize: 15,
-		fontWeight: "600",
-		color: "#1a1a1a",
-	},
-	postDate: {
-		fontSize: 14,
-		color: "#657786",
-		fontWeight: "400",
-	},
 	menuButton: {
 		padding: 4,
 		borderRadius: 20,
 		marginLeft: 8,
-	},
-	postContent: {
-		fontSize: 16,
-		lineHeight: 22,
-		color: "#1a1a1a",
-		marginBottom: 12,
 	},
 	hashtagContainer: {
 		marginBottom: 12,
@@ -550,7 +576,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	postImage: {
-		width: 300,
+		width: "auto",
 		height: 200,
 		borderRadius: 12,
 		marginRight: 8,
@@ -745,6 +771,44 @@ const styles = StyleSheet.create({
 		borderRadius: 3,
 		backgroundColor: "transparent",
 	},
+	postContainer: {
+		flexDirection: "row",
+		alignItems: "flex-start",
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+	},
+	postBody: {
+		flex: 1,
+		marginLeft: 12,
+	},
+	headerRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		flexWrap: "wrap",
+	},
+	authorName: {
+		fontSize: 15,
+		fontWeight: "700",
+		color: "#0F1419",
+		marginRight: 4,
+	},
+	dot: {
+		color: "#536471",
+		marginHorizontal: 2,
+	},
+	postDate: {
+		fontSize: 12,
+		color: "#536471",
+	},
+	postContent: {
+		fontSize: 15,
+		lineHeight: 20,
+		color: "#0F1419",
+		marginTop: 2,
+		marginBottom: 8,
+	},
 });
 
-export default React.memo(PostView);
+PostView.displayName = "PostView";
+
+export default PostView;

@@ -1,0 +1,22 @@
+stages:
+  - build
+
+build_android:
+  stage: build
+  image: openjdk:17
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - node_modules/
+      - .gradle/
+      - android/.gradle/
+  before_script:
+    - apt-get update && apt-get install -y nodejs npm unzip wget
+    - npm install
+  script:
+    - cd android
+    - ./gradlew assembleDebug --stacktrace
+  artifacts:
+    paths:
+      - android/app/build/outputs/apk/debug/app-debug.apk
+    expire_in: 7 days

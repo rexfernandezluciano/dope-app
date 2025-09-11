@@ -1,6 +1,6 @@
 /** @format */
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { NavigationContainer } from "@react-navigation/native";
@@ -89,7 +89,7 @@ const TabIcon: React.FC<TabIconProps & { iconName: TabIconName }> = React.memo((
 ));
 
 // Tab Navigator Component
-const MainTabNavigator: React.FC = () => {
+const MainTabNavigator: React.FC = React.memo(() => {
 	const tabScreenOptions = useCallback(
 		({ route }: RouteParams) => ({
 			...TAB_SCREEN_OPTIONS,
@@ -148,10 +148,10 @@ const MainTabNavigator: React.FC = () => {
 			/>
 		</Tab.Navigator>
 	);
-};
+});
 
 // Main Stack Navigator for authenticated users
-const AuthenticatedStack: React.FC = () => {
+const AuthenticatedStack: React.FC = React.memo(() => {
 	return (
 		<Stack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
 			<Stack.Screen
@@ -180,10 +180,10 @@ const AuthenticatedStack: React.FC = () => {
 			/>
 		</Stack.Navigator>
 	);
-};
+});
 
 // Authentication Stack Navigator
-const AuthStack: React.FC = () => {
+const AuthStack: React.FC = React.memo(() => {
 	return (
 		<Stack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
 			<Stack.Screen
@@ -203,14 +203,15 @@ const AuthStack: React.FC = () => {
 			/>
 		</Stack.Navigator>
 	);
-};
+});
 
 // Main App Navigator
 const AppNavigator: React.FC = () => {
 	const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
 
-	const checkAuthenticationStatus = async () => {
+	// Move checkAuthenticationStatus outside useEffect and memoize it
+	const checkAuthenticationStatus = useCallback(async () => {
 		try {
 			setIsLoading(true);
 			const authStatus = await AuthService.checkAuthStatus();
@@ -221,7 +222,7 @@ const AppNavigator: React.FC = () => {
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, []); // Empty dependency array since AuthService should be stable
 
 	useEffect(() => {
 		checkAuthenticationStatus();
@@ -232,7 +233,7 @@ const AppNavigator: React.FC = () => {
 		return () => {
 			unsubscribe?.();
 		};
-	}, [checkAuthenticationStatus]);
+	}, []); // Remove checkAuthenticationStatus from dependencies
 
 	// Memoize navigation structure to prevent unnecessary re-renders
 	const NavigationStructure = useMemo(() => {
@@ -245,5 +246,11 @@ const AppNavigator: React.FC = () => {
 
 	return <NavigationContainer>{NavigationStructure}</NavigationContainer>;
 };
+
+// Add display names for better debugging
+MainTabNavigator.displayName = "MainTabNavigator";
+AuthenticatedStack.displayName = "AuthenticatedStack";
+AuthStack.displayName = "AuthStack";
+TabIcon.displayName = "TabIcon";
 
 export default AppNavigator;

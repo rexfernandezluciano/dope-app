@@ -1,6 +1,6 @@
 /** @format */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
 	ScrollView,
 	View,
@@ -14,6 +14,7 @@ import {
 	StyleSheet,
 	Dimensions,
 	Alert,
+	ListRenderItem,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialIcons";
@@ -31,6 +32,104 @@ interface SearchPageProps {
 		};
 	};
 }
+
+// Memoized components for better performance
+const UserItem = React.memo<{ item: SearchUser; onPress: (userId: string) => void }>(({ item, onPress }) => (
+	<TouchableOpacity
+		style={styles.userItem}
+		onPress={() => onPress(item.uid)}
+		activeOpacity={0.7}>
+		<Image
+			source={{ uri: item.photoURL || "https://via.placeholder.com/50" }}
+			style={styles.userAvatar}
+		/>
+		<View style={styles.userInfo}>
+			<View style={styles.userNameContainer}>
+				<Text style={styles.userName}>{item.name}</Text>
+				{item.hasBlueCheck && (
+					<Icon
+						name="verified"
+						size={16}
+						color="#007AFF"
+						style={styles.verifiedIcon}
+					/>
+				)}
+			</View>
+			<Text style={styles.userUsername}>@{item.username}</Text>
+			{item.bio && (
+				<Text
+					style={styles.userBio}
+					numberOfLines={2}>
+					{item.bio}
+				</Text>
+			)}
+			{item.stats && (
+				<Text style={styles.userStats}>
+					{item.stats.followers.toLocaleString()} followers • {item.stats.posts} posts
+				</Text>
+			)}
+		</View>
+	</TouchableOpacity>
+));
+
+const CommentItem = React.memo<{ item: SearchComment; onPress: (postId: string) => void }>(({ item, onPress }) => (
+	<TouchableOpacity
+		style={styles.commentItem}
+		onPress={() => onPress(item.postId)}
+		activeOpacity={0.7}>
+		<Image
+			source={{ uri: item.authorPhotoURL || "https://via.placeholder.com/40" }}
+			style={styles.commentAvatar}
+		/>
+		<View style={styles.commentContent}>
+			<View style={styles.commentHeader}>
+				<Text style={styles.commentAuthor}>{item.authorName}</Text>
+				<Text style={styles.commentUsername}>@{item.authorUsername}</Text>
+				<Text style={styles.commentTime}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+			</View>
+			<Text
+				style={styles.commentText}
+				numberOfLines={3}>
+				{item.content}
+			</Text>
+			<Text style={styles.commentStats}>{item.likesCount} likes</Text>
+		</View>
+	</TouchableOpacity>
+));
+
+const PostItem = React.memo<{ item: Post; onPress: (postId: string) => void }>(({ item, onPress }) => (
+	<TouchableOpacity
+		style={styles.postItem}
+		onPress={() => onPress(item.id)}
+		activeOpacity={0.7}>
+		<Image
+			source={{ uri: item.author.photoURL || "https://via.placeholder.com/40" }}
+			style={styles.postAvatar}
+		/>
+		<View style={styles.postContent}>
+			<View style={styles.postHeader}>
+				<Text style={styles.postAuthor}>{item.author.name}</Text>
+				<Text style={styles.postUsername}>@{item.author.username}</Text>
+				<Text style={styles.postTime}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+			</View>
+			<Text
+				style={styles.postText}
+				numberOfLines={4}>
+				{item.content}
+			</Text>
+			<View style={styles.postStats}>
+				<Text style={styles.postStat}>{item.stats?.likes || 0} likes</Text>
+				<Text style={styles.postStat}>{item.stats?.comments || 0} comments</Text>
+				<Text style={styles.postStat}>{item.stats?.reposts || 0} shares</Text>
+			</View>
+		</View>
+	</TouchableOpacity>
+));
+
+// Add display names for debugging
+UserItem.displayName = "UserItem";
+CommentItem.displayName = "CommentItem";
+PostItem.displayName = "PostItem";
 
 const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 	// State management
@@ -60,50 +159,34 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 	// Refs
 	const searchInputRef = useRef<TextInput>(null);
 	const debounceTimeoutRef = useRef<NodeJS.Timeout>();
+	const isInitialLoadRef = useRef<boolean>(true);
 
-	// Load initial data
-	useEffect(() => {
-		loadTrendingSearches();
+	// Memoized tabs configuration
+	const tabs = useMemo<Array<{ key: SearchType; label: string }>>(
+		() => [
+			{ key: "all", label: "All" },
+			{ key: "posts", label: "Posts" },
+			{ key: "users", label: "Users" },
+			{ key: "comments", label: "Comments" },
+		],
+		[],
+	);
 
-		// Auto-focus search input
-		const focusTimeout = setTimeout(() => {
-			searchInputRef.current?.focus();
-		}, 300);
+	// Memoized FlatList configuration
+	const flatListConfig = useMemo(
+		() => ({
+			removeClippedSubviews: true,
+			maxToRenderPerBatch: 10,
+			updateCellsBatchingPeriod: 50,
+			windowSize: 10,
+			initialNumToRender: 8,
+			getItemLayout: undefined,
+		}),
+		[],
+	);
 
-		// Perform initial search if query provided
-		if (route?.params?.initialQuery) {
-			handleSearch(route.params.initialQuery);
-		}
-
-		return () => {
-			clearTimeout(focusTimeout);
-			if (debounceTimeoutRef.current) {
-				clearTimeout(debounceTimeoutRef.current);
-			}
-		};
-	}, []);
-
-	// Handle search input changes with debouncing
-	const handleSearchInputChange = (text: string) => {
-		setSearchQuery(text);
-
-		// Clear previous timeout
-		if (debounceTimeoutRef.current) {
-			clearTimeout(debounceTimeoutRef.current);
-		}
-
-		// Set new timeout for suggestions
-		if (text.trim().length >= 2) {
-			debounceTimeoutRef.current = setTimeout(() => {
-				loadSearchSuggestions(text);
-			}, 300);
-		} else {
-			setSuggestions([]);
-		}
-	};
-
-	// Load search suggestions
-	const loadSearchSuggestions = async (query: string) => {
+	// Load search suggestions - memoized
+	const loadSearchSuggestions = useCallback(async (query: string) => {
 		try {
 			const response = await SearchService.getSearchSuggestions(query, 5);
 			if (response.success && response.data) {
@@ -112,10 +195,10 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 		} catch (error) {
 			console.warn("Failed to load search suggestions:", error);
 		}
-	};
+	}, []);
 
-	// Load trending searches
-	const loadTrendingSearches = async () => {
+	// Load trending searches - memoized
+	const loadTrendingSearches = useCallback(async () => {
 		try {
 			const response = await SearchService.getTrendingSearches(10);
 			if (response.success && response.data) {
@@ -124,200 +207,328 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 		} catch (error) {
 			console.warn("Failed to load trending searches:", error);
 		}
-	};
+	}, []);
 
-	// Perform search based on active tab
-	const handleSearch = async (query: string = searchQuery, loadMore: boolean = false) => {
-		if (!query.trim()) {
-			setError("Please enter a search query");
-			return;
-		}
+	// Handle search input changes with debouncing - optimized
+	const handleSearchInputChange = useCallback(
+		(text: string) => {
+			setSearchQuery(text);
 
-		const searchFilters: SearchFilters = {
+			// Clear previous timeout
+			if (debounceTimeoutRef.current) {
+				clearTimeout(debounceTimeoutRef.current);
+			}
+
+			// Set new timeout for suggestions
+			if (text.trim().length >= 2) {
+				debounceTimeoutRef.current = setTimeout(() => {
+					loadSearchSuggestions(text);
+				}, 300);
+			} else {
+				setSuggestions([]);
+			}
+		},
+		[loadSearchSuggestions],
+	);
+
+	// Build search filters - memoized
+	const buildSearchFilters = useCallback(
+		(query: string, loadMore: boolean = false): SearchFilters => ({
 			query: query.trim(),
 			limit: 20,
 			sortBy: "desc",
 			cursor: loadMore ? nextCursor : undefined,
-		};
+		}),
+		[nextCursor],
+	);
 
-		try {
-			if (!loadMore) {
-				setIsLoading(true);
-				setError(null);
+	// Perform search based on active tab - optimized
+	const handleSearch = useCallback(
+		async (query: string = searchQuery, loadMore: boolean = false) => {
+			if (!query.trim()) {
+				setError("Please enter a search query");
+				return;
 			}
 
-			let response;
+			const searchFilters = buildSearchFilters(query, loadMore);
 
-			switch (activeTab) {
-				case "posts":
-					response = await SearchService.searchPosts(searchFilters);
-					if (response.success && response.data) {
-						setSearchResults(prev => ({
-							...prev,
-							posts: loadMore ? [...prev.posts, ...response.data!] : response.data!,
-							totalResults: response.data.length,
-						}));
-					}
-					break;
+			try {
+				if (!loadMore) {
+					setIsLoading(true);
+					setError(null);
+				}
 
-				case "users":
-					response = await SearchService.searchUsers(searchFilters);
-					if (response.success && response.data) {
-						setSearchResults(prev => ({
-							...prev,
-							users: loadMore ? [...prev.users, ...response.data!] : response.data!,
-							totalResults: response.data.length,
-						}));
-					}
-					break;
+				let response;
 
-				case "comments":
-					response = await SearchService.searchComments(searchFilters);
-					if (response.success && response.data) {
-						setSearchResults(prev => ({
-							...prev,
-							comments: loadMore ? [...prev.comments, ...response.data!] : response.data!,
-							totalResults: response.data.length,
-						}));
-					}
-					break;
+				switch (activeTab) {
+					case "posts":
+						response = await SearchService.searchPosts(searchFilters);
+						if (response.success && response.data) {
+							setSearchResults(prev => ({
+								...prev,
+								posts: loadMore ? [...prev.posts, ...response.data!] : response.data!,
+								totalResults: response.data.length,
+							}));
+						}
+						break;
 
-				default: // "all"
-					response = await SearchService.searchAll(searchFilters);
-					if (response.success && response.data) {
-						const newResults = response.data;
-						setSearchResults(
-							loadMore
-								? {
-										posts: [...searchResults.posts, ...newResults.posts],
-										users: [...searchResults.users, ...newResults.users],
-										comments: [...searchResults.comments, ...newResults.comments],
-										totalResults: searchResults.totalResults + newResults.totalResults,
-								  }
-								: newResults,
-						);
-					}
-					break;
+					case "users":
+						response = await SearchService.searchUsers(searchFilters);
+						if (response.success && response.data) {
+							setSearchResults(prev => ({
+								...prev,
+								users: loadMore ? [...prev.users, ...response.data!] : response.data!,
+								totalResults: response.data.length,
+							}));
+						}
+						break;
+
+					case "comments":
+						response = await SearchService.searchComments(searchFilters);
+						if (response.success && response.data) {
+							setSearchResults(prev => ({
+								...prev,
+								comments: loadMore ? [...prev.comments, ...response.data!] : response.data!,
+								totalResults: response.data.length,
+							}));
+						}
+						break;
+
+					default: // "all"
+						response = await SearchService.searchAll(searchFilters);
+						if (response.success && response.data) {
+							const newResults = response.data;
+							setSearchResults(prev =>
+								loadMore
+									? {
+											posts: [...prev.posts, ...newResults.posts],
+											users: [...prev.users, ...newResults.users],
+											comments: [...prev.comments, ...newResults.comments],
+											totalResults: prev.totalResults + newResults.totalResults,
+									  }
+									: newResults,
+							);
+						}
+						break;
+				}
+
+				if (response?.success) {
+					setHasMore(response.pagination?.hasMore || false);
+					setNextCursor(response.pagination?.nextCursor);
+					setHasSearched(true);
+					setSuggestions([]); // Clear suggestions after search
+				} else {
+					setError(response?.error || "Search failed. Please try again.");
+				}
+			} catch (error) {
+				setError("An unexpected error occurred. Please try again.");
+				console.error("Search error:", error);
+			} finally {
+				setIsLoading(false);
 			}
+		},
+		[searchQuery, activeTab, buildSearchFilters],
+	);
 
-			if (response?.success) {
-				setHasMore(response.pagination?.hasMore || false);
-				setNextCursor(response.pagination?.nextCursor);
-				setHasSearched(true);
-				setSuggestions([]); // Clear suggestions after search
-			} else {
-				setError(response?.error || "Search failed. Please try again.");
-			}
-		} catch (error) {
-			setError("An unexpected error occurred. Please try again.");
-			console.error("Search error:", error);
-		} finally {
-			setIsLoading(false);
-		}
-	};
+	// Navigation handlers - memoized
+	const navigateToProfile = useCallback(
+		(userId: string) => {
+			navigation.navigate("Profile", { userId });
+		},
+		[navigation],
+	);
 
-	// Handle refresh
-	const handleRefresh = async () => {
+	const navigateToPostDetail = useCallback(
+		(postId: string) => {
+			navigation.navigate("PostDetail", { postId });
+		},
+		[navigation],
+	);
+
+	// Handle refresh - memoized
+	const handleRefresh = useCallback(async () => {
 		if (!hasSearched || !searchQuery.trim()) return;
 
 		setIsRefreshing(true);
 		await handleSearch(searchQuery);
 		setIsRefreshing(false);
-	};
+	}, [hasSearched, searchQuery, handleSearch]);
 
-	// Handle load more
-	const handleLoadMore = () => {
+	// Handle load more - memoized
+	const handleLoadMore = useCallback(() => {
 		if (hasMore && !isLoading && nextCursor) {
 			handleSearch(searchQuery, true);
 		}
-	};
+	}, [hasMore, isLoading, nextCursor, handleSearch, searchQuery]);
 
-	// Handle tab change
-	const handleTabChange = (tab: SearchType) => {
-		setActiveTab(tab);
-		if (hasSearched && searchQuery.trim()) {
-			// Reset results and search with new tab
-			setSearchResults({ posts: [], users: [], comments: [], totalResults: 0 });
-			handleSearch(searchQuery);
-		}
-	};
-
-	// Handle suggestion tap
-	const handleSuggestionTap = (suggestion: string) => {
-		setSearchQuery(suggestion);
-		setSuggestions([]);
-		handleSearch(suggestion);
-	};
-
-	// Render search header
-	const renderSearchHeader = () => (
-		<View style={styles.searchHeader}>
-			<TouchableOpacity
-				style={styles.backButton}
-				onPress={() => navigation.goBack()}
-				hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-				<Icon
-					name="arrow-back"
-					size={24}
-					color="#333"
-				/>
-			</TouchableOpacity>
-
-			<View style={styles.searchInputContainer}>
-				<TextInput
-					ref={searchInputRef}
-					style={styles.searchInput}
-					placeholder="Search posts, users, and comments..."
-					value={searchQuery}
-					onChangeText={handleSearchInputChange}
-					onSubmitEditing={() => handleSearch()}
-					returnKeyType="search"
-					placeholderTextColor="#999"
-					autoCapitalize="none"
-					autoCorrect={false}
-				/>
-
-				{searchQuery.length > 0 && (
-					<TouchableOpacity
-						style={styles.clearButton}
-						onPress={() => {
-							setSearchQuery("");
-							setSuggestions([]);
-							setSearchResults({ posts: [], users: [], comments: [], totalResults: 0 });
-							setHasSearched(false);
-							setError(null);
-						}}>
-						<Icon
-							name="clear"
-							size={20}
-							color="#999"
-						/>
-					</TouchableOpacity>
-				)}
-			</View>
-
-			<TouchableOpacity
-				style={styles.searchButton}
-				onPress={() => handleSearch()}
-				disabled={!searchQuery.trim() || isLoading}>
-				{isLoading ? (
-					<ActivityIndicator
-						size="small"
-						color="#007AFF"
-					/>
-				) : (
-					<Icon
-						name="search"
-						size={24}
-						color={searchQuery.trim() ? "#007AFF" : "#999"}
-					/>
-				)}
-			</TouchableOpacity>
-		</View>
+	// Handle tab change - optimized
+	const handleTabChange = useCallback(
+		(tab: SearchType) => {
+			setActiveTab(tab);
+			if (hasSearched && searchQuery.trim()) {
+				// Reset results and search with new tab
+				setSearchResults({ posts: [], users: [], comments: [], totalResults: 0 });
+				handleSearch(searchQuery);
+			}
+		},
+		[hasSearched, searchQuery, handleSearch],
 	);
 
-	// Render search suggestions
-	const renderSuggestions = () => {
+	// Handle suggestion tap - memoized
+	const handleSuggestionTap = useCallback(
+		(suggestion: string) => {
+			setSearchQuery(suggestion);
+			setSuggestions([]);
+			handleSearch(suggestion);
+		},
+		[handleSearch],
+	);
+
+	// Clear search - memoized
+	const clearSearch = useCallback(() => {
+		setSearchQuery("");
+		setSuggestions([]);
+		setSearchResults({ posts: [], users: [], comments: [], totalResults: 0 });
+		setHasSearched(false);
+		setError(null);
+	}, []);
+
+	// Load initial data - optimized
+	useEffect(() => {
+		if (isInitialLoadRef.current) {
+			loadTrendingSearches();
+
+			// Auto-focus search input
+			const focusTimeout = setTimeout(() => {
+				searchInputRef.current?.focus();
+			}, 300);
+
+			// Perform initial search if query provided
+			if (route?.params?.initialQuery) {
+				handleSearch(route.params.initialQuery);
+			}
+
+			isInitialLoadRef.current = false;
+
+			return () => {
+				clearTimeout(focusTimeout);
+				if (debounceTimeoutRef.current) {
+					clearTimeout(debounceTimeoutRef.current);
+				}
+			};
+		}
+	}, []); // Only run once
+
+	// Render functions - memoized
+	const renderUserItem: ListRenderItem<SearchUser> = useCallback(
+		({ item }) => (
+			<UserItem
+				item={item}
+				onPress={navigateToProfile}
+			/>
+		),
+		[navigateToProfile],
+	);
+
+	const renderCommentItem: ListRenderItem<SearchComment> = useCallback(
+		({ item }) => (
+			<CommentItem
+				item={item}
+				onPress={navigateToPostDetail}
+			/>
+		),
+		[navigateToPostDetail],
+	);
+
+	const renderPostItem: ListRenderItem<Post> = useCallback(
+		({ item }) => (
+			<PostItem
+				item={item}
+				onPress={navigateToPostDetail}
+			/>
+		),
+		[navigateToPostDetail],
+	);
+
+	// Render list footer component - memoized
+	const renderListFooter = useCallback(() => {
+		if (!hasMore) return null;
+		return (
+			<View style={styles.loadMoreContainer}>
+				<ActivityIndicator
+					size="small"
+					color="#007AFF"
+				/>
+			</View>
+		);
+	}, [hasMore]);
+
+	// Render search header - memoized
+	const renderSearchHeader = useMemo(
+		() => (
+			<View style={styles.searchHeader}>
+				<TouchableOpacity
+					style={styles.backButton}
+					onPress={() => navigation.goBack()}
+					hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+					<Icon
+						name="arrow-back"
+						size={24}
+						color="#333"
+					/>
+				</TouchableOpacity>
+
+				<View style={styles.searchInputContainer}>
+					<TextInput
+						ref={searchInputRef}
+						style={styles.searchInput}
+						placeholder="Search posts, users, and comments..."
+						value={searchQuery}
+						onChangeText={handleSearchInputChange}
+						onSubmitEditing={() => handleSearch()}
+						returnKeyType="search"
+						placeholderTextColor="#999"
+						autoCapitalize="none"
+						autoCorrect={false}
+					/>
+
+					{searchQuery.length > 0 && (
+						<TouchableOpacity
+							style={styles.clearButton}
+							onPress={clearSearch}>
+							<Icon
+								name="clear"
+								size={20}
+								color="#999"
+							/>
+						</TouchableOpacity>
+					)}
+				</View>
+
+				<TouchableOpacity
+					style={styles.searchButton}
+					onPress={() => handleSearch()}
+					disabled={!searchQuery.trim() || isLoading}>
+					{isLoading ? (
+						<ActivityIndicator
+							size="small"
+							color="#007AFF"
+						/>
+					) : (
+						<Icon
+							name="search"
+							size={24}
+							color={searchQuery.trim() ? "#007AFF" : "#999"}
+						/>
+					)}
+				</TouchableOpacity>
+			</View>
+		),
+		[searchQuery, isLoading, navigation, handleSearchInputChange, handleSearch, clearSearch],
+	);
+
+	// Render search suggestions - memoized
+	const renderSuggestions = useMemo(() => {
 		if (suggestions.length === 0) return null;
 
 		return (
@@ -337,18 +548,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 				))}
 			</View>
 		);
-	};
+	}, [suggestions, handleSuggestionTap]);
 
-	// Render search tabs
-	const renderSearchTabs = () => {
+	// Render search tabs - memoized
+	const renderSearchTabs = useMemo(() => {
 		if (!hasSearched) return null;
-
-		const tabs: Array<{ key: SearchType; label: string }> = [
-			{ key: "all", label: "All" },
-			{ key: "posts", label: "Posts" },
-			{ key: "users", label: "Users" },
-			{ key: "comments", label: "Comments" },
-		];
 
 		return (
 			<View style={styles.tabsContainer}>
@@ -362,102 +566,10 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 				))}
 			</View>
 		);
-	};
+	}, [hasSearched, tabs, activeTab, handleTabChange]);
 
-	// Render user item
-	const renderUserItem = ({ item }: { item: SearchUser }) => (
-		<TouchableOpacity
-			style={styles.userItem}
-			onPress={() => navigation.navigate("Profile", { userId: item.uid })}>
-			<Image
-				source={{ uri: item.photoURL || "https://via.placeholder.com/50" }}
-				style={styles.userAvatar}
-			/>
-			<View style={styles.userInfo}>
-				<View style={styles.userNameContainer}>
-					<Text style={styles.userName}>{item.name}</Text>
-					{item.hasBlueCheck && (
-						<Icon
-							name="verified"
-							size={16}
-							color="#007AFF"
-							style={styles.verifiedIcon}
-						/>
-					)}
-				</View>
-				<Text style={styles.userUsername}>@{item.username}</Text>
-				{item.bio && (
-					<Text
-						style={styles.userBio}
-						numberOfLines={2}>
-						{item.bio}
-					</Text>
-				)}
-				{item.stats && (
-					<Text style={styles.userStats}>
-						{item.stats.followers.toLocaleString()} followers • {item.stats.posts} posts
-					</Text>
-				)}
-			</View>
-		</TouchableOpacity>
-	);
-
-	// Render comment item
-	const renderCommentItem = ({ item }: { item: SearchComment }) => (
-		<TouchableOpacity
-			style={styles.commentItem}
-			onPress={() => navigation.navigate("PostDetail", { postId: item.postId })}>
-			<Image
-				source={{ uri: item.authorPhotoURL || "https://via.placeholder.com/40" }}
-				style={styles.commentAvatar}
-			/>
-			<View style={styles.commentContent}>
-				<View style={styles.commentHeader}>
-					<Text style={styles.commentAuthor}>{item.authorName}</Text>
-					<Text style={styles.commentUsername}>@{item.authorUsername}</Text>
-					<Text style={styles.commentTime}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-				</View>
-				<Text
-					style={styles.commentText}
-					numberOfLines={3}>
-					{item.content}
-				</Text>
-				<Text style={styles.commentStats}>{item.likesCount} likes</Text>
-			</View>
-		</TouchableOpacity>
-	);
-
-	// Render post item (simplified version)
-	const renderPostItem = ({ item }: { item: Post }) => (
-		<TouchableOpacity
-			style={styles.postItem}
-			onPress={() => navigation.navigate("PostDetail", { postId: item.id })}>
-			<Image
-				source={{ uri: item.author.photoURL || "https://via.placeholder.com/40" }}
-				style={styles.postAvatar}
-			/>
-			<View style={styles.postContent}>
-				<View style={styles.postHeader}>
-					<Text style={styles.postAuthor}>{item.author.name}</Text>
-					<Text style={styles.postUsername}>@{item.author.username}</Text>
-					<Text style={styles.postTime}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-				</View>
-				<Text
-					style={styles.postText}
-					numberOfLines={4}>
-					{item.content}
-				</Text>
-				<View style={styles.postStats}>
-					<Text style={styles.postStat}>{item.likesCount} likes</Text>
-					<Text style={styles.postStat}>{item.commentsCount} comments</Text>
-					<Text style={styles.postStat}>{item.sharesCount} shares</Text>
-				</View>
-			</View>
-		</TouchableOpacity>
-	);
-
-	// Render search results based on active tab
-	const renderSearchResults = () => {
+	// Render search results based on active tab - optimized
+	const renderSearchResults = useMemo(() => {
 		if (isLoading && !searchResults.totalResults) {
 			return (
 				<View style={styles.loadingContainer}>
@@ -514,16 +626,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 						showsVerticalScrollIndicator={false}
 						onEndReached={handleLoadMore}
 						onEndReachedThreshold={0.1}
-						ListFooterComponent={() =>
-							hasMore ? (
-								<View style={styles.loadMoreContainer}>
-									<ActivityIndicator
-										size="small"
-										color="#007AFF"
-									/>
-								</View>
-							) : null
-						}
+						ListFooterComponent={renderListFooter}
+						{...flatListConfig}
 					/>
 				);
 
@@ -537,16 +641,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 						showsVerticalScrollIndicator={false}
 						onEndReached={handleLoadMore}
 						onEndReachedThreshold={0.1}
-						ListFooterComponent={() =>
-							hasMore ? (
-								<View style={styles.loadMoreContainer}>
-									<ActivityIndicator
-										size="small"
-										color="#007AFF"
-									/>
-								</View>
-							) : null
-						}
+						ListFooterComponent={renderListFooter}
+						{...flatListConfig}
 					/>
 				);
 
@@ -560,16 +656,8 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 						showsVerticalScrollIndicator={false}
 						onEndReached={handleLoadMore}
 						onEndReachedThreshold={0.1}
-						ListFooterComponent={() =>
-							hasMore ? (
-								<View style={styles.loadMoreContainer}>
-									<ActivityIndicator
-										size="small"
-										color="#007AFF"
-									/>
-								</View>
-							) : null
-						}
+						ListFooterComponent={renderListFooter}
+						{...flatListConfig}
 					/>
 				);
 
@@ -589,7 +677,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 							<View style={styles.sectionContainer}>
 								<Text style={styles.sectionTitle}>Users</Text>
 								{searchResults.users.slice(0, 3).map(user => (
-									<View key={user.uid}>{renderUserItem({ item: user })}</View>
+									<UserItem
+										key={user.uid}
+										item={user}
+										onPress={navigateToProfile}
+									/>
 								))}
 								{searchResults.users.length > 3 && (
 									<TouchableOpacity
@@ -610,7 +702,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 							<View style={styles.sectionContainer}>
 								<Text style={styles.sectionTitle}>Posts</Text>
 								{searchResults.posts.slice(0, 3).map(post => (
-									<View key={post.id}>{renderPostItem({ item: post })}</View>
+									<PostItem
+										key={post.id}
+										item={post}
+										onPress={navigateToPostDetail}
+									/>
 								))}
 								{searchResults.posts.length > 3 && (
 									<TouchableOpacity
@@ -631,7 +727,11 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 							<View style={styles.sectionContainer}>
 								<Text style={styles.sectionTitle}>Comments</Text>
 								{searchResults.comments.slice(0, 3).map(comment => (
-									<View key={comment.id}>{renderCommentItem({ item: comment })}</View>
+									<CommentItem
+										key={comment.id}
+										item={comment}
+										onPress={navigateToPostDetail}
+									/>
 								))}
 								{searchResults.comments.length > 3 && (
 									<TouchableOpacity
@@ -650,10 +750,29 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 					</ScrollView>
 				);
 		}
-	};
+	}, [
+		isLoading,
+		error,
+		hasSearched,
+		searchResults,
+		searchQuery,
+		activeTab,
+		handleSearch,
+		renderUserItem,
+		renderCommentItem,
+		renderPostItem,
+		handleLoadMore,
+		renderListFooter,
+		flatListConfig,
+		isRefreshing,
+		handleRefresh,
+		navigateToProfile,
+		navigateToPostDetail,
+		handleTabChange,
+	]);
 
-	// Render trending searches when no search performed
-	const renderTrendingSearches = () => {
+	// Render trending searches when no search performed - memoized
+	const renderTrendingSearches = useMemo(() => {
 		if (hasSearched || trendingSearches.length === 0) return null;
 
 		return (
@@ -674,19 +793,16 @@ const SearchPage: React.FC<SearchPageProps> = ({ navigation, route }) => {
 				))}
 			</View>
 		);
-	};
+	}, [hasSearched, trendingSearches, handleSuggestionTap]);
 
 	return (
 		<SafeAreaView style={styles.container}>
-			{renderSearchHeader()}
-
-			{renderSuggestions()}
-
-			{renderSearchTabs()}
-
+			{renderSearchHeader}
+			{renderSuggestions}
+			{renderSearchTabs}
 			<View style={styles.contentContainer}>
-				{renderSearchResults()}
-				{renderTrendingSearches()}
+				{renderSearchResults}
+				{renderTrendingSearches}
 			</View>
 		</SafeAreaView>
 	);
@@ -1040,4 +1156,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default SearchPage;
+export default React.memo(SearchPage);

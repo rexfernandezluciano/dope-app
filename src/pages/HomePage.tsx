@@ -1,6 +1,6 @@
 /** @format */
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { View, Text, FlatList, RefreshControl, Alert, Dimensions, ScrollView } from "react-native";
 import { FAB, IconButton, Modal, Portal, Chip, Surface, Button, Divider, ActivityIndicator } from "react-native-paper";
 import { TabView, SceneMap, TabBar } from "react-native-tab-view";
@@ -15,6 +15,10 @@ import { Post, PostFilters, FilterState } from "../api/interface/post.interface"
 interface TabRoute {
 	key: string;
 	title: string;
+}
+
+interface HomePagePost extends Post {
+	// Add any additional properties if needed
 }
 
 const initialWidth = Dimensions.get("window").width;
@@ -32,10 +36,13 @@ const HomePage: React.FC = () => {
 
 	// Tab navigation state
 	const [tabIndex, setTabIndex] = useState<number>(0);
-	const [routes] = useState<TabRoute[]>([
-		{ key: "feed", title: "Feed" },
-		{ key: "following", title: "Following" },
-	]);
+	const routes = useMemo<TabRoute[]>(
+		() => [
+			{ key: "feed", title: "Feed" },
+			{ key: "following", title: "Following" },
+		],
+		[],
+	);
 
 	// Filter state management
 	const [filters, setFilters] = useState<FilterState>({
@@ -50,28 +57,8 @@ const HomePage: React.FC = () => {
 	// Temporary filter state for modal
 	const [tempFilters, setTempFilters] = useState<FilterState>(filters);
 
-	// Authentication status monitoring
-	useEffect(() => {
-		const checkAuthStatus = async () => {
-			try {
-				const authStatus = await AuthService.checkAuthStatus();
-				setIsAuthenticated(authStatus);
-			} catch (error) {
-				console.error("Auth status check failed:", error);
-				setIsAuthenticated(false);
-			}
-		};
-
-		checkAuthStatus();
-		const unsubscribe = AuthService.onAuthStateChanged?.(user => {
-			setIsAuthenticated(!!user);
-		});
-
-		return () => unsubscribe?.();
-	}, []);
-
-	// Optimized filter building function
-	const buildPostFilters = (currentFilters: FilterState): PostFilters => {
+	// Memoized filter building function
+	const buildPostFilters = useCallback((currentFilters: FilterState): PostFilters => {
 		const postFilters: PostFilters = {
 			limit: 20,
 			sortBy: currentFilters.sortBy,
@@ -92,10 +79,11 @@ const HomePage: React.FC = () => {
 		}
 
 		return postFilters;
-	};
+	}, []);
 
 	// Enhanced post fetching with proper error handling and retry logic
-	const fetchPosts = async (feedType: "feed" | "following", refresh = false, retryCount = 0): Promise<void> => {
+	const fetchPosts = useCallback(
+		async (feedType: "feed" | "following", refresh = false, retryCount = 0): Promise<void> => {
 			try {
 				if (refresh) {
 					setRefreshing(true);
@@ -146,7 +134,29 @@ const HomePage: React.FC = () => {
 				setLoading(false);
 				setRefreshing(false);
 			}
+		},
+		[buildPostFilters, filters, isAuthenticated],
+	);
+
+	// Authentication status monitoring
+	useEffect(() => {
+		const checkAuthStatus = async () => {
+			try {
+				const authStatus = await AuthService.checkAuthStatus();
+				setIsAuthenticated(authStatus);
+			} catch (error) {
+				console.error("Auth status check failed:", error);
+				setIsAuthenticated(false);
+			}
 		};
+
+		checkAuthStatus();
+		const unsubscribe = AuthService.onAuthStateChanged?.(user => {
+			setIsAuthenticated(!!user);
+		});
+
+		return () => unsubscribe?.();
+	}, []);
 
 	// Load initial data based on authentication status
 	useEffect(() => {
@@ -154,23 +164,17 @@ const HomePage: React.FC = () => {
 		if (isAuthenticated) {
 			fetchPosts("following");
 		}
-	}, [isAuthenticated]); // Removed fetchPosts dependency to avoid infinite loops
+	}, [isAuthenticated, fetchPosts]);
 
-	// Debounced filter application
-	const debouncedFilterApplication = useMemo(() => {
-		let timeoutId: NodeJS.Timeout;
-		return (newFilters: FilterState) => {
-			clearTimeout(timeoutId);
-			timeoutId = setTimeout(() => {
-				setFilters(newFilters);
-				const currentFeedType = routes[tabIndex].key as "feed" | "following";
-				fetchPosts(currentFeedType);
-			}, 300);
-		};
-	}, [routes, tabIndex, fetchPosts]);
+	// Effect for handling filter changes
+	useEffect(() => {
+		const currentFeedType = routes[tabIndex].key as "feed" | "following";
+		fetchPosts(currentFeedType);
+	}, [filters, routes, tabIndex, fetchPosts]);
 
 	// Handle tab change with data loading
-	const handleIndexChange = (index: number) => {
+	const handleIndexChange = useCallback(
+		(index: number) => {
 			setTabIndex(index);
 			const feedType = routes[index].key as "feed" | "following";
 
@@ -178,27 +182,29 @@ const HomePage: React.FC = () => {
 				return;
 			}
 
-			// Only fetch if we don't have data or if it's been a while
+			// Only fetch if we don't have data
 			const posts = feedType === "feed" ? feedPosts : followingPosts;
 			if (posts.length === 0) {
 				fetchPosts(feedType);
 			}
-		};
+		},
+		[routes, isAuthenticated, feedPosts, followingPosts, fetchPosts],
+	);
 
 	// Pull-to-refresh functionality
-	const onRefresh = () => {
+	const onRefresh = useCallback(() => {
 		const currentFeedType = routes[tabIndex].key as "feed" | "following";
 		fetchPosts(currentFeedType, true);
-	};
+	}, [routes, tabIndex, fetchPosts]);
 
 	// Filter application with validation
-	const applyFilters = () => {
+	const applyFilters = useCallback(() => {
 		setFilterModalVisible(false);
-		debouncedFilterApplication(tempFilters);
-	};
+		setFilters(tempFilters);
+	}, [tempFilters]);
 
 	// Reset filters to default state
-	const resetFilters = () => {
+	const resetFilters = useCallback(() => {
 		const defaultFilters: FilterState = {
 			postType: "all",
 			sortBy: "asc",
@@ -208,10 +214,10 @@ const HomePage: React.FC = () => {
 			random: true,
 		};
 		setTempFilters(defaultFilters);
-	};
+	}, []);
 
 	// Post creation navigation
-	const handleCreatePost = () => {
+	const handleCreatePost = useCallback(() => {
 		if (!isAuthenticated) {
 			Alert.alert("Authentication Required", "Please log in to create and share posts with the community.", [
 				{
@@ -224,10 +230,11 @@ const HomePage: React.FC = () => {
 		}
 
 		navigation.navigate("createPost" as never);
-	};
+	}, [isAuthenticated, navigation]);
 
 	// Optimized post renderer with error boundary
-	const renderPost = ({ item }: { item: Post }) => {
+	const renderPost = useCallback(
+		({ item }: { item: Post }) => {
 			try {
 				return (
 					<PostView
@@ -241,10 +248,13 @@ const HomePage: React.FC = () => {
 				console.error("Error rendering post:", error);
 				return null;
 			}
-		};
+		},
+		[navigation],
+	);
 
 	// Enhanced empty state component with contextual messaging
-	const renderEmptyState = (feedType: "feed" | "following") => (
+	const renderEmptyState = useCallback(
+		(feedType: "feed" | "following") => (
 			<View style={styles.emptyState}>
 				<Text style={styles.emptyStateTitle}>{feedType === "following" ? "No posts from people you follow" : "No posts found"}</Text>
 				<Text style={styles.emptyStateSubtitle}>
@@ -261,7 +271,9 @@ const HomePage: React.FC = () => {
 					</Button>
 				)}
 			</View>
-		);
+		),
+		[],
+	);
 
 	// Optimized FlatList configuration
 	const flatListConfig = useMemo(
@@ -271,13 +283,14 @@ const HomePage: React.FC = () => {
 			updateCellsBatchingPeriod: 50,
 			windowSize: 10,
 			initialNumToRender: 5,
-			getItemLayout: undefined, // Let FlatList calculate automatically
+			getItemLayout: undefined,
 		}),
 		[],
 	);
 
-	// Feed tab scene component
-	const FeedRoute = () => (
+	// FIXED: Create proper React components instead of functions
+	const FeedRoute = useCallback(
+		() => (
 			<FlatList
 				data={feedPosts}
 				renderItem={renderPost}
@@ -295,10 +308,11 @@ const HomePage: React.FC = () => {
 				contentContainerStyle={feedPosts.length === 0 ? styles.emptyContainer : styles.postList}
 				{...flatListConfig}
 			/>
-		);
+		),
+		[feedPosts, renderPost, renderEmptyState, refreshing, onRefresh, flatListConfig],
+	);
 
-	// Following tab scene component
-	const FollowingRoute = () => {
+	const FollowingRoute = useCallback(() => {
 		if (!isAuthenticated) {
 			return (
 				<View style={styles.emptyState}>
@@ -333,20 +347,17 @@ const HomePage: React.FC = () => {
 				{...flatListConfig}
 			/>
 		);
-	};
+	}, [isAuthenticated, followingPosts, renderPost, renderEmptyState, refreshing, onRefresh, flatListConfig, navigation]);
 
-	// Scene mapping for tab view
-	const renderScene = useMemo(
-		() =>
-			SceneMap({
-				feed: FeedRoute,
-				following: FollowingRoute,
-			}),
-		[FeedRoute, FollowingRoute],
-	);
+	// FIXED: Use the components directly in SceneMap
+	const renderScene = SceneMap({
+		feed: FeedRoute,
+		following: FollowingRoute,
+	});
 
 	// Custom tab bar component
-	const renderTabBar = (props: any) => (
+	const renderTabBar = useCallback(
+		(props: any) => (
 			<TabBar
 				{...props}
 				indicatorStyle={styles.tabIndicator}
@@ -356,120 +367,125 @@ const HomePage: React.FC = () => {
 				inactiveColor="#666666"
 				pressColor="rgba(0, 105, 181, 0.12)"
 			/>
-		);
+		),
+		[],
+	);
 
 	// Enhanced filter modal content with better UX
-	const renderFilterModal = () => (
-		<Portal>
-			<Modal
-				visible={filterModalVisible}
-				onDismiss={() => setFilterModalVisible(false)}
-				contentContainerStyle={styles.modalContainer}>
-				<Surface style={styles.modalSurface}>
-					<View style={styles.modalHeader}>
-						<Text style={styles.modalTitle}>Filter Posts</Text>
-						<IconButton
-							icon="close"
-							size={24}
-							onPress={() => setFilterModalVisible(false)}
-						/>
-					</View>
+	const renderFilterModal = useMemo(
+		() => (
+			<Portal>
+				<Modal
+					visible={filterModalVisible}
+					onDismiss={() => setFilterModalVisible(false)}
+					contentContainerStyle={styles.modalContainer}>
+					<Surface style={styles.modalSurface}>
+						<View style={styles.modalHeader}>
+							<Text style={styles.modalTitle}>Filter Posts</Text>
+							<IconButton
+								icon="close"
+								size={24}
+								onPress={() => setFilterModalVisible(false)}
+							/>
+						</View>
 
-					<Divider />
-					<ScrollView
-						showsVerticalScrollIndicator={false}
-						contentContainerStyle={{ paddingBottom: 20 }}>
-						<View style={styles.filterSection}>
-							<Text style={styles.filterSectionTitle}>Post Type</Text>
-							<View style={styles.filterChipContainer}>
-								{(["all", "text", "poll", "live_video", "repost"] as const).map(type => (
+						<Divider />
+						<ScrollView
+							showsVerticalScrollIndicator={false}
+							contentContainerStyle={{ paddingBottom: 20 }}>
+							<View style={styles.filterSection}>
+								<Text style={styles.filterSectionTitle}>Post Type</Text>
+								<View style={styles.filterChipContainer}>
+									{(["all", "text", "poll", "live_video", "repost"] as const).map(type => (
+										<Chip
+											key={type}
+											selected={tempFilters.postType === type}
+											onPress={() => setTempFilters(prev => ({ ...prev, postType: type }))}
+											style={[styles.filterChip, tempFilters.postType === type && { backgroundColor: "#0069b5" }]}
+											textStyle={tempFilters.postType === type ? { color: "#ffffff" } : undefined}>
+											{type === "all" ? "All" : type === "live_video" ? "Live" : type.charAt(0).toUpperCase() + type.slice(1)}
+										</Chip>
+									))}
+								</View>
+							</View>
+
+							<View style={styles.filterSection}>
+								<Text style={styles.filterSectionTitle}>Sort By</Text>
+								<View style={styles.filterChipContainer}>
+									{(
+										[
+											{ key: "desc", name: "Recent" },
+											{ key: "asc", name: "Older" },
+										] as const
+									).map(sort => (
+										<Chip
+											key={sort.key}
+											selected={tempFilters.sortBy === sort.key}
+											onPress={() => setTempFilters(prev => ({ ...prev, sortBy: sort.key }))}
+											style={[styles.filterChip, tempFilters.sortBy === sort.key && { backgroundColor: "#0069b5", color: "#ffffff" }]}
+											textStyle={tempFilters.sortBy === sort.key ? { color: "#ffffff" } : undefined}>
+											{sort.name}
+										</Chip>
+									))}
+								</View>
+							</View>
+
+							<View style={styles.filterSection}>
+								<Text style={styles.filterSectionTitle}>Time Range</Text>
+								<View style={styles.filterChipContainer}>
+									{(["hour", "day", "week", "month", "all"] as const).map(range => (
+										<Chip
+											key={range}
+											selected={tempFilters.timeRange === range}
+											onPress={() => setTempFilters(prev => ({ ...prev, timeRange: range }))}
+											style={[styles.filterChip, tempFilters.timeRange === range && { backgroundColor: "#0069b5" }]}
+											textStyle={tempFilters.timeRange === range ? { color: "#ffffff" } : undefined}>
+											{range === "all" ? "All Time" : `Past ${range.charAt(0).toUpperCase() + range.slice(1)}`}
+										</Chip>
+									))}
+								</View>
+							</View>
+
+							<View style={styles.filterSection}>
+								<Text style={styles.filterSectionTitle}>Content Options</Text>
+								<View style={styles.filterChipContainer}>
 									<Chip
-										key={type}
-										selected={tempFilters.postType === type}
-										onPress={() => setTempFilters(prev => ({ ...prev, postType: type }))}
-										style={[styles.filterChip, tempFilters.postType === type && { backgroundColor: "#0069b5" }]}
-										textStyle={tempFilters.postType === type ? { color: "#ffffff" } : undefined}>
-										{type === "all" ? "All" : type === "live_video" ? "Live" : type.charAt(0).toUpperCase() + type.slice(1)}
+										selected={tempFilters.hasImages}
+										onPress={() => setTempFilters(prev => ({ ...prev, hasImages: !prev.hasImages }))}
+										style={[styles.filterChip, tempFilters.hasImages && { backgroundColor: "#0069b5" }]}
+										textStyle={tempFilters.hasImages ? { color: "#ffffff" } : undefined}>
+										With Images
 									</Chip>
-								))}
-							</View>
-						</View>
-
-						<View style={styles.filterSection}>
-							<Text style={styles.filterSectionTitle}>Sort By</Text>
-							<View style={styles.filterChipContainer}>
-								{(
-									[
-										{ key: "desc", name: "Recent" },
-										{ key: "asc", name: "Older" },
-									] as const
-								).map(sort => (
 									<Chip
-										key={sort.key}
-										selected={tempFilters.sortBy === sort.key}
-										onPress={() => setTempFilters(prev => ({ ...prev, sortBy: sort.key }))}
-										style={[styles.filterChip, tempFilters.sortBy === sort.key && { backgroundColor: "#0069b5", color: "#ffffff" }]}
-										textStyle={tempFilters.sortBy === sort.key ? { color: "#ffffff" } : undefined}>
-										{sort.name}
+										selected={tempFilters.quality}
+										onPress={() => setTempFilters(prev => ({ ...prev, quality: !prev.quality }))}
+										style={[styles.filterChip, tempFilters.quality && { backgroundColor: "#0069b5" }]}
+										textStyle={tempFilters.quality ? { color: "#ffffff" } : undefined}>
+										High Quality
 									</Chip>
-								))}
+								</View>
 							</View>
-						</View>
 
-						<View style={styles.filterSection}>
-							<Text style={styles.filterSectionTitle}>Time Range</Text>
-							<View style={styles.filterChipContainer}>
-								{(["hour", "day", "week", "month", "all"] as const).map(range => (
-									<Chip
-										key={range}
-										selected={tempFilters.timeRange === range}
-										onPress={() => setTempFilters(prev => ({ ...prev, timeRange: range }))}
-										style={[styles.filterChip, tempFilters.timeRange === range && { backgroundColor: "#0069b5" }]}
-										textStyle={tempFilters.timeRange === range ? { color: "#ffffff" } : undefined}>
-										{range === "all" ? "All Time" : `Past ${range.charAt(0).toUpperCase() + range.slice(1)}`}
-									</Chip>
-								))}
+							<View style={styles.modalActions}>
+								<Button
+									mode="outlined"
+									onPress={resetFilters}
+									style={[styles.modalButton, { flex: 1, marginRight: 8 }]}>
+									Reset
+								</Button>
+								<Button
+									mode="contained"
+									onPress={applyFilters}
+									style={[styles.modalButton, { flex: 1, backgroundColor: "#0069b5" }]}>
+									Apply Filters
+								</Button>
 							</View>
-						</View>
-
-						<View style={styles.filterSection}>
-							<Text style={styles.filterSectionTitle}>Content Options</Text>
-							<View style={styles.filterChipContainer}>
-								<Chip
-									selected={tempFilters.hasImages}
-									onPress={() => setTempFilters(prev => ({ ...prev, hasImages: !prev.hasImages }))}
-									style={[styles.filterChip, tempFilters.hasImages && { backgroundColor: "#0069b5" }]}
-									textStyle={tempFilters.hasImages ? { color: "#ffffff" } : undefined}>
-									With Images
-								</Chip>
-								<Chip
-									selected={tempFilters.quality}
-									onPress={() => setTempFilters(prev => ({ ...prev, quality: !prev.quality }))}
-									style={[styles.filterChip, tempFilters.quality && { backgroundColor: "#0069b5" }]}
-									textStyle={tempFilters.quality ? { color: "#ffffff" } : undefined}>
-									High Quality
-								</Chip>
-							</View>
-						</View>
-
-						<View style={styles.modalActions}>
-							<Button
-								mode="outlined"
-								onPress={resetFilters}
-								style={[styles.modalButton, { flex: 1, marginRight: 8 }]}>
-								Reset
-							</Button>
-							<Button
-								mode="contained"
-								onPress={applyFilters}
-								style={[styles.modalButton, { flex: 1, backgroundColor: "#0069b5" }]}>
-								Apply Filters
-							</Button>
-						</View>
-					</ScrollView>
-				</Surface>
-			</Modal>
-		</Portal>
+						</ScrollView>
+					</Surface>
+				</Modal>
+			</Portal>
+		),
+		[filterModalVisible, tempFilters, resetFilters, applyFilters],
 	);
 
 	// Loading state component with better UX
@@ -522,7 +538,7 @@ const HomePage: React.FC = () => {
 			/>
 
 			{/* Filter modal */}
-			{renderFilterModal()}
+			{renderFilterModal}
 
 			{/* Create post FAB with fixed colors */}
 			<FAB

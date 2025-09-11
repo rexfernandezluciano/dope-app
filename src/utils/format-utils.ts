@@ -77,8 +77,8 @@ export const formatDateWithFallback = (dateString: string): string => {
 	}
 };
 
-const formatCount = useCallback((count: number) => {
+export const formatCount = (count: number) => {
 	if (count < 1000) return count.toString();
 	if (count < 1000000) return `${(count / 1000).toFixed(1)}k`;
 	return `${(count / 1000000).toFixed(1)}M`;
-}, []);
+};

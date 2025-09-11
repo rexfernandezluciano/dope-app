@@ -12,6 +12,7 @@ import { ScrollProvider, useScrollContext } from "../context/ScrollContext";
 import HomePage from "../pages/HomePage";
 import LoginPage from "../pages/LoginPage";
 import SignupPage from "../pages/SignupPage";
+import ForgotPasswordPage from "../pages/ForgotPasswordPage";
 import ProfilePage from "../pages/ProfilePage";
 import AnalyticsPage from "../pages/AnalyticsPage";
 import NotificationPage from "../pages/NotificationPage";
@@ -262,6 +263,22 @@ const AuthStack: React.FC = React.memo(() => {
                                 options={{
                                         title: "Create Account",
                                         presentation: "modal",
+                                }}
+                        />
+                        <Stack.Screen
+                                name="forgotPassword"
+                                component={ForgotPasswordPage}
+                                options={{
+                                        title: "Reset Password",
+                                        headerShown: true,
+                                        headerStyle: {
+                                                backgroundColor: "#ffffff",
+                                        },
+                                        headerTintColor: "#0069b5",
+                                        headerTitleStyle: {
+                                                fontWeight: "600",
+                                                color: "#1a1a1a",
+                                        },
                                 }}
                         />
                 </Stack.Navigator>

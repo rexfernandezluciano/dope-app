@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "^5.0.4",
+    "@gorhom/bottom-sheet": "^5.2.6",
     "@react-native-community/datetimepicker": "8.4.1",
     "@react-native-vector-icons/material-design-icons": "^12.3.0",
     "@react-navigation/bottom-tabs": "^6.6.1",

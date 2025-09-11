@@ -1,7 +1,7 @@
 /** @format */
 
 // Enhanced type definitions with better structure
-interface Post {
+export interface Post {
 	id: string;
 	content?: string;
 	imageUrls: string[];

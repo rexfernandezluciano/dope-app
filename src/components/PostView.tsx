@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { View, Text, TouchableOpacity, Image, ScrollView, Alert, StyleSheet, Dimensions } from "react-native";
-import { Avatar, IconButton, Chip, Card, Icon, Menu } from "react-native-paper";
+import { Avatar, IconButton, Card, Icon } from "react-native-paper";
 import BottomSheet from "@gorhom/bottom-sheet";
 
 import PostService from "../services/PostService";

@@ -1,8 +1,9 @@
 /** @format */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { View, Text, TouchableOpacity, Image, ScrollView, Alert, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, Image, ScrollView, Alert, StyleSheet, Dimensions } from "react-native";
 import { Avatar, IconButton, Chip, Card, Icon, Menu } from "react-native-paper";
+import BottomSheet from "@gorhom/bottom-sheet";
 
 import PostService from "../services/PostService";
 import AuthService from "../services/AuthService";
@@ -25,6 +26,9 @@ const PostView: React.FC<PostViewProps> = React.memo(
 		const abortControllerRef = useRef<AbortController | null>(null);
 		const lastPostIdRef = useRef(post.id);
 
+		// Refs for Bottom Sheet
+		const bottomSheetRef = useRef<BottomSheet>(null);
+
 		// Memoized values
 		const currentUserId = useMemo(() => AuthService.user?.uid, []);
 		const initialIsLiked = useMemo(() => post.likes?.some(like => like.user?.uid === currentUserId) || false, [post.likes, currentUserId]);
@@ -35,6 +39,7 @@ const PostView: React.FC<PostViewProps> = React.memo(
 		const [loading, setLoading] = useState(false);
 		const [repostLoading, setRepostLoading] = useState(false);
 		const [shareLoading, setShareLoading] = useState(false);
+		const [isMenuVisible, setIsMenuVisible] = useState(false);
 
 		// Track view only once per post and only when post changes
 		useEffect(() => {
@@ -229,13 +234,43 @@ const PostView: React.FC<PostViewProps> = React.memo(
 			}
 		}, [onNavigateToProfile, post.author?.uid]);
 
-		const handleMenuPress = useCallback(() => {
-			Alert.alert("Post Options", "What would you like to do?", [
-				{ text: "Cancel", style: "cancel" },
-				{ text: "Copy Link", onPress: () => console.log("Copy link") },
-				{ text: "Report Post", style: "destructive", onPress: () => console.log("Report post") },
+		const openMenu = useCallback(() => setIsMenuVisible(true), []);
+		const closeMenu = useCallback(() => setIsMenuVisible(false), []);
+
+		const handleCopyLink = useCallback(() => {
+			console.log("Copy link");
+			closeMenu();
+		}, [closeMenu]);
+
+		const handleDeletePost = useCallback(() => {
+			Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
+				{ text: "Cancel", style: "cancel", onPress: closeMenu },
+				{
+					text: "Delete",
+					style: "destructive",
+					onPress: async () => {
+						try {
+							await PostService.deletePost(post.id);
+							showSuccessAlert("Post deleted successfully!");
+							closeMenu();
+						} catch (error) {
+							showErrorAlert("Failed to delete post");
+							closeMenu();
+						}
+					},
+				},
 			]);
-		}, []);
+		}, [post.id, closeMenu, showSuccessAlert, showErrorAlert]);
+
+		const handleReportPost = useCallback(() => {
+			console.log("Report post");
+			closeMenu();
+		}, [closeMenu]);
+
+		// Function to open the bottom sheet menu
+		const handleOpenBottomSheet = () => {
+			bottomSheetRef.current?.snapToIndex(0);
+		};
 
 		// Memoized render functions to prevent unnecessary re-renders
 		const renderLinkPreview = useMemo(() => {
@@ -409,7 +444,7 @@ const PostView: React.FC<PostViewProps> = React.memo(
 				style={styles.postCard}>
 				<Card.Content style={styles.postContainer}>
 					{/* Left column: Avatar */}
-					<TouchableOpacity onPress={onNavigateToProfile}>
+					<TouchableOpacity onPress={handleAuthorPress}>
 						<Avatar.Image
 							size={48}
 							source={{ uri: post.author?.photoURL }}
@@ -431,6 +466,17 @@ const PostView: React.FC<PostViewProps> = React.memo(
 							)}
 							<Text style={styles.dot}>·</Text>
 							<Text style={styles.postDate}>{formatDate(post.createdAt)}</Text>
+
+							{/* Horizontal dots menu */}
+							<View style={styles.postHeaderMenu}>
+								<IconButton
+									icon="dots-horizontal"
+									iconColor="#657786"
+									size={20}
+									onPress={handleOpenBottomSheet}
+									style={styles.menuButton}
+								/>
+							</View>
 						</View>
 
 						{/* Post text */}
@@ -499,6 +545,37 @@ const PostView: React.FC<PostViewProps> = React.memo(
 							</TouchableOpacity>
 						</View>
 					</View>
+
+					{/* Bottom Sheet Menu */}
+					<BottomSheet
+						ref={bottomSheetRef}
+						index={-1}
+						snapPoints={["35%"]}
+						enablePanDownToClose={true}
+						backgroundStyle={styles.bottomSheet}
+						handleIndicatorStyle={styles.bottomSheetHandle}
+						backdropComponent={({ style }) => <View style={[styles.bottomSheetOverlay, style]} />}
+					>
+						<View style={styles.bottomSheetContainer}>
+							<TouchableOpacity style={styles.bottomSheetOption} onPress={handleCopyLink}>
+								<Icon source="link" size={20} color="#657786" />
+								<Text style={styles.bottomSheetOptionText}>Copy Link</Text>
+							</TouchableOpacity>
+							{AuthService.user?.uid === post.author?.uid && (
+								<TouchableOpacity style={styles.bottomSheetOption} onPress={handleDeletePost}>
+									<Icon source="delete-outline" size={20} color={styles.destructiveText.color} />
+									<Text style={[styles.bottomSheetOptionText, styles.destructiveText]}>Delete Post</Text>
+								</TouchableOpacity>
+							)}
+							<TouchableOpacity style={styles.bottomSheetOption} onPress={handleReportPost}>
+								<Icon source="flag-outline" size={20} color="#657786" />
+								<Text style={styles.bottomSheetOptionText}>Report Post</Text>
+							</TouchableOpacity>
+							<TouchableOpacity style={styles.bottomSheetCancelOption} onPress={() => bottomSheetRef.current?.close()}>
+								<Text style={styles.bottomSheetCancelText}>Cancel</Text>
+							</TouchableOpacity>
+						</View>
+					</BottomSheet>
 				</Card.Content>
 			</Card>
 		);
@@ -553,6 +630,10 @@ const styles = StyleSheet.create({
 		padding: 4,
 		borderRadius: 20,
 		marginLeft: 8,
+	},
+	postHeaderMenu: {
+		flex: 1,
+		alignItems: "flex-end",
 	},
 	hashtagContainer: {
 		marginBottom: 12,
@@ -806,6 +887,59 @@ const styles = StyleSheet.create({
 		color: "#0F1419",
 		marginTop: 2,
 		marginBottom: 8,
+	},
+	// Bottom Sheet Styles
+	bottomSheetOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		justifyContent: "flex-end",
+	},
+	bottomSheetContainer: {
+		justifyContent: "flex-end",
+	},
+	bottomSheet: {
+		backgroundColor: "#ffffff",
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
+		paddingBottom: 20,
+		maxHeight: Dimensions.get("window").height * 0.6,
+	},
+	bottomSheetHandle: {
+		width: 40,
+		height: 4,
+		backgroundColor: "#e1e8ed",
+		borderRadius: 2,
+		alignSelf: "center",
+		marginTop: 12,
+		marginBottom: 20,
+	},
+	bottomSheetOption: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		borderBottomWidth: 1,
+		borderBottomColor: "#f7f9fa",
+	},
+	bottomSheetOptionText: {
+		fontSize: 16,
+		color: "#0f1419",
+		fontWeight: "500",
+		marginLeft: 16,
+	},
+	destructiveText: {
+		color: "#e91e63",
+	},
+	bottomSheetCancelOption: {
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		alignItems: "center",
+		marginTop: 8,
+	},
+	bottomSheetCancelText: {
+		fontSize: 16,
+		color: "#657786",
+		fontWeight: "600",
 	},
 });
 

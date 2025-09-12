@@ -18,18 +18,20 @@ interface PostViewProps {
 	onRepostWithComment?: (postId: string) => void;
 	onNavigateToProfile?: (userId: string) => void;
 	onPostRender?: (postId: string) => void;
+	onOpenBottomSheet?: () => void;
 }
 
 const PostView: React.FC<PostViewProps> = React.memo(
-	({ post, onComment, onRepostWithComment, onNavigateToProfile }) => {
+	({ post, onComment, onRepostWithComment, onNavigateToProfile, onPostRender, onOpenBottomSheet }) => {
 		// Refs to prevent multiple API calls
 		const viewTrackedRef = useRef(false);
 		const abortControllerRef = useRef<AbortController | null>(null);
 		const lastPostIdRef = useRef(post.id);
 
-		// Refs for Bottom Sheet
-		const bottomSheetRef = useRef<BottomSheet>(null);
-		onPostRender(post.id);
+		// Call onPostRender if provided
+		if (onPostRender) {
+			onPostRender(post.id);
+		}
 
 		// Memoized values
 		const currentUserId = useMemo(() => AuthService.user?.uid, []);
@@ -41,7 +43,6 @@ const PostView: React.FC<PostViewProps> = React.memo(
 		const [loading, setLoading] = useState(false);
 		const [repostLoading, setRepostLoading] = useState(false);
 		const [shareLoading, setShareLoading] = useState(false);
-		const [isMenuVisible, setIsMenuVisible] = useState(false);
 
 		// Track view only once per post and only when post changes
 		useEffect(() => {
@@ -239,94 +240,7 @@ const PostView: React.FC<PostViewProps> = React.memo(
 			}
 		}, [onNavigateToProfile, post.author?.uid]);
 
-		const openMenu = useCallback(() => setIsMenuVisible(true), []);
-		const closeMenu = useCallback(() => setIsMenuVisible(false), []);
-
-		const handleCopyLink = useCallback(async () => {
-			try {
-				// Use share functionality for mobile, construct URL for web
-				const postUrl = `https://dopp.eu.org/post/${post.id}`;
-
-				// Use the PostService share endpoint
-				const result = await PostService.sharePost(post.id);
-				if (result.success) {
-					showSuccessAlert("Post shared successfully!");
-				} else {
-					showErrorAlert(result.error || "Failed to share post");
-				}
-			} catch (error) {
-				console.error("Failed to share post:", error);
-				showErrorAlert("Failed to share post");
-			} finally {
-				bottomSheetRef.current?.close();
-			}
-		}, [post.id, post.author?.name, post.content, showSuccessAlert, showErrorAlert]);
-
-		const handleDeletePost = useCallback(() => {
-			Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
-				{ text: "Cancel", style: "cancel", onPress: closeMenu },
-				{
-					text: "Delete",
-					style: "destructive",
-					onPress: async () => {
-						try {
-							await PostService.deletePost(post.id);
-							showSuccessAlert("Post deleted successfully!");
-							closeMenu();
-						} catch (error) {
-							showErrorAlert("Failed to delete post");
-							closeMenu();
-						}
-					},
-				},
-			]);
-		}, [post.id, closeMenu, showSuccessAlert, showErrorAlert]);
-
-		const handleReportPost = useCallback(() => {
-			Alert.alert("Report Post", "Why are you reporting this post?", [
-				{ text: "Cancel", style: "cancel", onPress: () => bottomSheetRef.current?.close() },
-				{
-					text: "Spam",
-					onPress: () => submitReport("spam", "This post contains spam content"),
-				},
-				{
-					text: "Harassment",
-					onPress: () => submitReport("harassment", "This post contains harassment"),
-				},
-				{
-					text: "Inappropriate Content",
-					onPress: () => submitReport("inappropriate", "This post contains inappropriate content"),
-				},
-				{
-					text: "Misinformation",
-					onPress: () => submitReport("misinformation", "This post contains false information"),
-				},
-			]);
-		}, []);
-
-		const submitReport = useCallback(
-			async (reason: string, description: string) => {
-				try {
-					const result = await PostService.reportPost(post.id, reason, description);
-					if (result.success) {
-						showSuccessAlert("Report submitted successfully. Thank you for helping keep our community safe.");
-					} else {
-						showErrorAlert(result.error || "Failed to submit report");
-					}
-				} catch (error) {
-					console.error("Failed to report post:", error);
-					showErrorAlert("Failed to submit report");
-				} finally {
-					bottomSheetRef.current?.close();
-				}
-			},
-			[post.id, showSuccessAlert, showErrorAlert],
-		);
-
-		// Function to open the bottom sheet menu
-		const handleOpenBottomSheet = () => {
-			bottomSheetRef.current?.snapToIndex(0);
-		};
+		
 
 		// Memoized render functions to prevent unnecessary re-renders
 		const renderLinkPreview = useMemo(() => {
@@ -522,7 +436,7 @@ const PostView: React.FC<PostViewProps> = React.memo(
 										icon="dots-horizontal"
 										iconColor="#657786"
 										size={20}
-										onPress={handleOpenBottomSheet}
+										onPress={onOpenBottomSheet}
 										style={styles.menuButton}
 									/>
 								</View>
@@ -609,7 +523,8 @@ const PostView: React.FC<PostViewProps> = React.memo(
 			(prevProps.post.likes?.length || 0) === (nextProps.post.likes?.length || 0) &&
 			prevProps.onComment === nextProps.onComment &&
 			prevProps.onRepostWithComment === nextProps.onRepostWithComment &&
-			prevProps.onNavigateToProfile === nextProps.onNavigateToProfile
+			prevProps.onNavigateToProfile === nextProps.onNavigateToProfile &&
+			prevProps.onOpenBottomSheet === nextProps.onOpenBottomSheet
 		);
 	},
 );

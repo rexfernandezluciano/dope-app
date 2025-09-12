@@ -1,22 +1,22 @@
 /** @format */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  Alert, 
-  RefreshControl, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  ScrollView,
+  Alert,
+  RefreshControl,
+  TouchableOpacity,
   TextInput,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
-import { 
-  Card, 
-  Button, 
-  IconButton, 
-  Avatar, 
+import {
+  Card,
+  Button,
+  IconButton,
+  Avatar,
   Divider,
   ActivityIndicator
 } from 'react-native-paper';
@@ -158,7 +158,7 @@ const PostDetailPage: React.FC = () => {
     // Second pass: organize into threads
     flatComments.forEach(comment => {
       const processedComment = commentMap.get(comment.id)!;
-      
+
       if (comment.parentId) {
         const parent = commentMap.get(comment.parentId);
         if (parent) {
@@ -172,7 +172,7 @@ const PostDetailPage: React.FC = () => {
 
     // Sort by creation date (newest first for root, oldest first for replies)
     rootComments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    
+
     const sortReplies = (comments: Comment[]) => {
       comments.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       comments.forEach(comment => {
@@ -241,7 +241,7 @@ const PostDetailPage: React.FC = () => {
                     ...comment.stats,
                     likes: isLiked ? comment.stats.likes - 1 : comment.stats.likes + 1,
                   },
-                  likes: isLiked 
+                  likes: isLiked
                     ? comment.likes?.filter(like => like.user.uid !== currentUserId)
                     : [...(comment.likes || []), { user: { uid: currentUserId!, username: AuthService.user?.username || '' } }]
                 };
@@ -306,7 +306,7 @@ const PostDetailPage: React.FC = () => {
               </Text>
             </View>
             <Text style={styles.commentText}>{comment.content}</Text>
-            
+
             {/* Comment Actions */}
             <View style={styles.commentActions}>
               <TouchableOpacity
@@ -315,7 +315,7 @@ const PostDetailPage: React.FC = () => {
               >
                 <Text style={styles.commentActionText}>Reply</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.commentAction, isLiked && styles.commentActionLiked]}
                 onPress={() => handleCommentLike(comment.id)}
@@ -366,8 +366,8 @@ const PostDetailPage: React.FC = () => {
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
@@ -375,11 +375,12 @@ const PostDetailPage: React.FC = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadPostAndComments(true)} />}
       >
         {/* Post Detail */}
-        <PostView 
+        <PostView
           post={post}
-          onComment={() => {}} // No action needed as we're already on detail page
-          onRepostWithComment={() => {}}
-          onNavigateToProfile={(userId) => navigation.navigate('profile' as never, { userId } as never)}
+          onComment={postId => navigation.navigate("postDetails" as never, { postId } as never)}
+          onRepostWithComment={postId => navigation.navigate("createPost" as never, { repostId: postId } as never)}
+          onNavigateToProfile={userId => navigation.navigate("profile" as never, { userId } as never)}
+          onOpenBottomSheet={() => {}}
         />
 
         <Divider style={{ marginVertical: 16 }} />
@@ -399,7 +400,7 @@ const PostDetailPage: React.FC = () => {
                   <Button mode="text" onPress={cancelReply}>Cancel</Button>
                 </View>
               )}
-              
+
               <View style={styles.commentInputRow}>
                 <Avatar.Image
                   size={32}

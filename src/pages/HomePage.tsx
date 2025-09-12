@@ -1,8 +1,8 @@
 /** @format */
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { View, Text, FlatList, RefreshControl, Alert, Dimensions, ScrollView } from "react-native";
-import { FAB, IconButton, Modal, Portal, Chip, Surface, Button, Divider, ActivityIndicator } from "react-native-paper";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { View, Text, FlatList, RefreshControl, Alert, Dimensions, ScrollView, TouchableOpacity } from "react-native";
+import { FAB, IconButton, Modal, Portal, Chip, Surface, Button, Divider, ActivityIndicator, Icon } from "react-native-paper";
 import { TabView, SceneMap, TabBar } from "react-native-tab-view";
 import { useNavigation } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -38,6 +38,10 @@ const HomePage: React.FC = () => {
 	const [refreshing, setRefreshing] = useState<boolean>(false);
 	const [filterModalVisible, setFilterModalVisible] = useState<boolean>(false);
 	const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+
+	// BottomSheet state
+	const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+	const [shareLoading, setShareLoading] = useState(false);
 
 	// Tab navigation state
 	const [tabIndex, setTabIndex] = useState<number>(0);
@@ -237,9 +241,106 @@ const HomePage: React.FC = () => {
 		navigation.navigate("createPost" as never);
 	}, [isAuthenticated, navigation]);
 
-	const handleOpenBottomSheet = () => {
+	const handleOpenBottomSheet = useCallback((post: Post) => {
+		setSelectedPost(post);
 		bottomSheetRef.current?.snapToIndex(0);
-	};
+	}, []);
+
+	const showSuccessAlert = useCallback((message: string) => {
+		Alert.alert("Success", message);
+	}, []);
+
+	const showErrorAlert = useCallback((message: string = "An unexpected error occurred") => {
+		Alert.alert("Error", message);
+	}, []);
+
+	const handleCopyLink = useCallback(async () => {
+		if (!selectedPost) return;
+
+		try {
+			const result = await PostService.sharePost(selectedPost.id);
+			if (result.success) {
+				showSuccessAlert("Post shared successfully!");
+			} else {
+				showErrorAlert(result.error || "Failed to share post");
+			}
+		} catch (error) {
+			console.error("Failed to share post:", error);
+			showErrorAlert("Failed to share post");
+		} finally {
+			bottomSheetRef.current?.close();
+		}
+	}, [selectedPost, showSuccessAlert, showErrorAlert]);
+
+	const handleDeletePost = useCallback(() => {
+		if (!selectedPost) return;
+
+		Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
+			{ text: "Cancel", style: "cancel", onPress: () => bottomSheetRef.current?.close() },
+			{
+				text: "Delete",
+				style: "destructive",
+				onPress: async () => {
+					try {
+						await PostService.deletePost(selectedPost.id);
+						showSuccessAlert("Post deleted successfully!");
+						// Refresh the current feed
+						const currentFeedType = routes[tabIndex].key as "feed" | "following";
+						fetchPosts(currentFeedType, true);
+					} catch (error) {
+						showErrorAlert("Failed to delete post");
+					} finally {
+						bottomSheetRef.current?.close();
+					}
+				},
+			},
+		]);
+	}, [selectedPost, showSuccessAlert, showErrorAlert, routes, tabIndex, fetchPosts]);
+
+	const handleReportPost = useCallback(() => {
+		if (!selectedPost) return;
+
+		Alert.alert("Report Post", "Why are you reporting this post?", [
+			{ text: "Cancel", style: "cancel", onPress: () => bottomSheetRef.current?.close() },
+			{
+				text: "Spam",
+				onPress: () => submitReport("spam", "This post contains spam content"),
+			},
+			{
+				text: "Harassment",
+				onPress: () => submitReport("harassment", "This post contains harassment"),
+			},
+			{
+				text: "Inappropriate Content",
+				onPress: () => submitReport("inappropriate", "This post contains inappropriate content"),
+			},
+			{
+				text: "Misinformation",
+				onPress: () => submitReport("misinformation", "This post contains false information"),
+			},
+		]);
+	}, [selectedPost]);
+
+	const submitReport = useCallback(
+		async (reason: string, description: string) => {
+			if (!selectedPost) return;
+
+			try {
+				const result = await PostService.reportPost(selectedPost.id, reason, description);
+				if (result.success) {
+					showSuccessAlert("Report submitted successfully. Thank you for helping keep our community safe.");
+				} else {
+					showErrorAlert(result.error || "Failed to submit report");
+				}
+			} catch (error) {
+				console.error("Failed to report post:", error);
+				showErrorAlert("Failed to submit report");
+			} finally {
+				bottomSheetRef.current?.close();
+			}
+		},
+		[selectedPost, showSuccessAlert, showErrorAlert],
+	);
 
 	// Optimized post renderer with error boundary
 	const renderPost = useCallback(
@@ -251,6 +352,8 @@ const HomePage: React.FC = () => {
 						onComment={postId => navigation.navigate("postDetails" as never, { postId } as never)}
 						onRepostWithComment={postId => navigation.navigate("createPost" as never, { repostId: postId } as never)}
 						onNavigateToProfile={userId => navigation.navigate("profile" as never, { userId } as never)}
+						onPostRender={() => {}}
+						onOpenBottomSheet={() => handleOpenBottomSheet(item)}
 					/>
 				);
 			} catch (error) {
@@ -258,7 +361,7 @@ const HomePage: React.FC = () => {
 				return null;
 			}
 		},
-		[navigation],
+		[navigation, handleOpenBottomSheet],
 	);
 
 	// Enhanced empty state component with contextual messaging
@@ -383,6 +486,66 @@ const HomePage: React.FC = () => {
 		),
 		[],
 	);
+
+	// BottomSheet styles
+	const bottomSheetStyles = useMemo(() => ({
+		bottomSheetOverlay: {
+			position: "absolute" as const,
+			top: 0,
+			left: 0,
+			right: 0,
+			bottom: 0,
+			backgroundColor: "transparent",
+			pointerEvents: "none" as const,
+		},
+		bottomSheetContainer: {
+			justifyContent: "flex-end" as const,
+		},
+		bottomSheet: {
+			backgroundColor: "#ffffff",
+			borderTopLeftRadius: 20,
+			borderTopRightRadius: 20,
+			paddingBottom: 20,
+			maxHeight: Dimensions.get("window").height * 0.6,
+		},
+		bottomSheetHandle: {
+			width: 40,
+			height: 4,
+			backgroundColor: "#e1e8ed",
+			borderRadius: 2,
+			alignSelf: "center" as const,
+			marginTop: 12,
+			marginBottom: 20,
+		},
+		bottomSheetOption: {
+			flexDirection: "row" as const,
+			alignItems: "center" as const,
+			paddingVertical: 16,
+			paddingHorizontal: 24,
+			borderBottomWidth: 1,
+			borderBottomColor: "#f7f9fa",
+		},
+		bottomSheetOptionText: {
+			fontSize: 16,
+			color: "#0f1419",
+			fontWeight: "500" as const,
+			marginLeft: 16,
+		},
+		destructiveText: {
+			color: "#e91e63",
+		},
+		bottomSheetCancelOption: {
+			paddingVertical: 16,
+			paddingHorizontal: 24,
+			alignItems: "center" as const,
+			marginTop: 8,
+		},
+		bottomSheetCancelText: {
+			fontSize: 16,
+			color: "#657786",
+			fontWeight: "600" as const,
+		},
+	}), []);
 
 	// Enhanced filter modal content with better UX
 	const renderFilterModal = useMemo(
@@ -569,46 +732,46 @@ const HomePage: React.FC = () => {
 				index={-1}
 				snapPoints={["35%"]}
 				enablePanDownToClose={true}
-				backgroundStyle={styles.bottomSheet}
-				handleIndicatorStyle={styles.bottomSheetHandle}
-				backdropComponent={({ style }) => <View style={[styles.bottomSheetOverlay, style]} />}>
-				<BottomSheetView style={styles.bottomSheetContainer}>
+				backgroundStyle={bottomSheetStyles.bottomSheet}
+				handleIndicatorStyle={bottomSheetStyles.bottomSheetHandle}
+				backdropComponent={({ style }) => <View style={[bottomSheetStyles.bottomSheetOverlay, style]} />}>
+				<BottomSheetView style={bottomSheetStyles.bottomSheetContainer}>
 					<TouchableOpacity
-						style={styles.bottomSheetOption}
+						style={bottomSheetStyles.bottomSheetOption}
 						onPress={handleCopyLink}>
 						<Icon
 							source="link"
 							size={20}
 							color="#657786"
 						/>
-						<Text style={styles.bottomSheetOptionText}>Copy Link</Text>
+						<Text style={bottomSheetStyles.bottomSheetOptionText}>Copy Link</Text>
 					</TouchableOpacity>
-					{AuthService.user?.uid === post.author?.uid && (
+					{selectedPost && AuthService.user?.uid === selectedPost.author?.uid && (
 						<TouchableOpacity
-							style={styles.bottomSheetOption}
+							style={bottomSheetStyles.bottomSheetOption}
 							onPress={handleDeletePost}>
 							<Icon
 								source="delete-outline"
 								size={20}
-								color={styles.destructiveText.color}
+								color="#e91e63"
 							/>
-							<Text style={[styles.bottomSheetOptionText, styles.destructiveText]}>Delete Post</Text>
+							<Text style={[bottomSheetStyles.bottomSheetOptionText, { color: "#e91e63" }]}>Delete Post</Text>
 						</TouchableOpacity>
 					)}
 					<TouchableOpacity
-						style={styles.bottomSheetOption}
+						style={bottomSheetStyles.bottomSheetOption}
 						onPress={handleReportPost}>
 						<Icon
 							source="flag-outline"
 							size={20}
 							color="#657786"
 						/>
-						<Text style={styles.bottomSheetOptionText}>Report Post</Text>
+						<Text style={bottomSheetStyles.bottomSheetOptionText}>Report Post</Text>
 					</TouchableOpacity>
 					<TouchableOpacity
-						style={styles.bottomSheetCancelOption}
+						style={bottomSheetStyles.bottomSheetCancelOption}
 						onPress={() => bottomSheetRef.current?.close()}>
-						<Text style={styles.bottomSheetCancelText}>Cancel</Text>
+						<Text style={bottomSheetStyles.bottomSheetCancelText}>Cancel</Text>
 					</TouchableOpacity>
 				</BottomSheetView>
 			</BottomSheet>

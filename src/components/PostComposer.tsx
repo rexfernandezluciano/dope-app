@@ -187,7 +187,7 @@ const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreated }) =
 
                                         {/* Poll Section */}
                                         {showPoll && (
-                                                <Card style={styles.pollContainer}>
+                                                <Card elevation={0} style={styles.pollContainer}>
                                                         <Card.Content>
                                                                 <Text style={styles.pollTitle}>Create a poll</Text>
                                                                 <TextInput
@@ -268,12 +268,6 @@ const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreated }) =
                                                         <IconButton icon="map-marker-outline" size={24} iconColor="#8E8E93" />
                                                 </TouchableOpacity>
                                         </View>
-
-                                        {/* Add to thread option */}
-                                        <TouchableOpacity style={styles.addToThreadButton}>
-                                                <Avatar.Image size={20} source={{ uri: user?.photoURL || "https://via.placeholder.com/20" }} />
-                                                <Text style={styles.addToThreadText}>Add to thread</Text>
-                                        </TouchableOpacity>
                                 </ScrollView>
 
                                 {/* Bottom Bar */}
